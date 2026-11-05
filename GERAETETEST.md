@@ -113,6 +113,16 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] L6 In „Behauptung prüfen“ bei einer Aussage „Antwort entwerfen“ → Wechsel zu „Antwort entwerfen“ mit vorgeschlagenen Einträgen.
 - [ ] L7 Einen echten Entwurf für eine X-Diskussion erstellen und notieren, was am Text gut ist und was stört.
 
+## M. Phase 4B, Etappe 1: KI-Auftrag kopieren (ab Version 3.6.0)
+
+- [ ] M1 Ohne Einschalten: Unter „Behauptung prüfen“ und „Antwort entwerfen“ gibt es keine KI-Knöpfe.
+- [ ] M2 Optionen → „KI-Erweiterung (optional)“ → **An**. App schließen und neu öffnen: bleibt an.
+- [ ] M3 „Behauptung prüfen“ mit einem Text analysieren → „KI-Auftrag erstellen (ganzer Text)“ → Vorschau mit passenden Einträgen; @-Namen und Links fehlen im Text.
+- [ ] M4 Einen Eintrag abwählen → er verschwindet aus der Vorschau. „@-Namen und Links mitschicken“ ankreuzen → sie erscheinen.
+- [ ] M5 „Prompt kopieren“ → in eine KI deiner Wahl einfügen (z. B. Claude oder ChatGPT) → die KI antwortet mit einem JSON-Block. **Bitte die Antwort aufheben** (z. B. in einer Notiz); sie wird für den Test der nächsten Etappe gebraucht.
+- [ ] M6 „Antwort entwerfen“ → Einträge vorschlagen → „KI-Auftrag erstellen (Antwort formulieren lassen)“ → in der KI ausprobieren.
+- [ ] M7 Optionen: „Kopierte Aufträge“ zählt mit; „Protokoll löschen“ (zweimal tippen) setzt auf 0.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

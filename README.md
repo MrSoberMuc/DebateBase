@@ -103,6 +103,17 @@ Unter **Diskussion → Antwort entwerfen** entsteht ein Antwortentwurf **nur aus
 
 Es entstehen keine neuen Fakten. Nur Überleitungen und der Einleitungssatz kommen aus festen Vorlagen. Der Entwurf wird nicht gespeichert. Prüfe und bearbeite ihn vor dem Posten.
 
+### KI-Auftrag kopieren (optional, ab Version 3.6.0)
+
+Unter **Optionen → KI-Erweiterung** einschalten (standardmäßig aus). Danach gibt es in **Behauptung prüfen** und **Antwort entwerfen** den Knopf **KI-Auftrag erstellen**:
+
+- DebateBase zeigt den **vollständigen Prompt** als Vorschau: Aufgabe, dein Text (ohne @-Namen und Links, auf Wunsch mit), die passenden Einträge, Karten und Quellen mit ihren Kennungen und ein festes Antwortformat.
+- Einträge lassen sich abwählen. Eigene Notizen und Schlussfolgerungen sind nie enthalten.
+- **Prompt kopieren** legt genau diesen Text in die Zwischenablage. Du fügst ihn selbst in eine KI deiner Wahl ein. **DebateBase sendet nichts ins Internet** und braucht keine Zugangsdaten.
+- Ein Protokoll auf dem Gerät zählt, wann welcher Auftrag kopiert wurde (löschbar).
+
+Die KI antwortet mit einem Datenblock. Das Einlesen dieser Antwort folgt in der nächsten Version.
+
 ## 3. X-Beiträge teilen
 
 Voraussetzung: DebateBase ist **installiert**.
@@ -168,6 +179,7 @@ Wenn eine neue Version veröffentlicht ist, erscheint in der App **„Eine neue 
 | `app.js` | Oberfläche, Bedienung, Teilen-Eingang, Installation |
 | `db.js` | Datenbank (IndexedDB) mit Versionierung und Transaktionen |
 | `migrate.js` | Import: Format erkennen, prüfen, Konflikte, Nachkontrolle |
+| `ki.js` | Optionale KI-Erweiterung: erzeugt den kopierbaren Prompt (sendet nichts) |
 | `analyse.js` | Lokale Analyse ohne KI: intelligente Suche, verwandte Inhalte (Phase 4) |
 | `service-worker.js` | Offline-Speicher der App-Dateien, Updates, Empfang geteilter Beiträge |
 | `manifest.json` | Angaben für Installation und Teilen-Ziel |

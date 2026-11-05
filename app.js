@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.5.0';
+var APP_VERSION='3.6.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -777,7 +777,7 @@ function bkCounts(c){c=c||{};return (c.entries||0)+' Einträge, '+(c.sources||0)
 function viewSettings(){
  var th=Repo.db.settings.theme,D=Repo.db,ts=D.meta&&D.meta.lastSaved,iss=checkIntegrity();
  var prot=Repo.persisted===true?'Aktiv':Repo.persisted===false?'Nicht gewährt (Chrome entscheidet selbst; nach der Installation meist aktiv)':'Unbekannt';
- return '<section class="sec"><h2>Darstellung</h2><div class="seg">'+[['system','System'],['hell','Hell'],['dunkel','Dunkel']].map(function(p){return '<button data-act="set-theme" data-v="'+p[0]+'" aria-pressed="'+(th===p[0])+'">'+p[1]+'</button>'}).join('')+'</div></section>'+viewApp()+synSection()+
+ return '<section class="sec"><h2>Darstellung</h2><div class="seg">'+[['system','System'],['hell','Hell'],['dunkel','Dunkel']].map(function(p){return '<button data-act="set-theme" data-v="'+p[0]+'" aria-pressed="'+(th===p[0])+'">'+p[1]+'</button>'}).join('')+'</div></section>'+viewApp()+synSection()+kiSection()+
  '<section class="sec"><h2>Datensicherheit</h2><div class="card"><dl><dt>Einträge</dt><dd>'+D.entries.length+'</dd><dt>Quellen</dt><dd>'+D.sources.length+'</dd><dt>Karten</dt><dd>'+D.args.length+'</dd><dt>Verknüpfungen</dt><dd>'+D.links.length+'</dd><dt>X-Beiträge</dt><dd>'+D.posts.length+'</dd>'+
  '<dt>Speicher</dt><dd>'+(Repo.ready?'IndexedDB auf diesem Gerät':'Nur Arbeitsspeicher, geht beim Schließen verloren')+'</dd>'+
  '<dt>Schutz vor Löschen</dt><dd>'+prot+'</dd><dt>Belegt</dt><dd id="usage">…</dd><dt>Datenbank</dt><dd>Version '+DB.VERSION+'</dd>'+
@@ -898,6 +898,7 @@ function paintCheck(){
  var order=['pruefbar','gemischt','meinung','frage','aussage','fragment'];
  var h='<div class="card" id="csum"><h3 style="margin:0 0 6px">'+S.length+(S.length===1?' Aussage erkannt':' Aussagen erkannt')+'</h3><div class="chips" style="flex-wrap:wrap">'+order.filter(function(k){return sum[k]}).map(function(k){return '<span class="chip ck-'+k+'">'+esc(Analyse.CLAIM_KINDS[k])+': '+sum[k]+'</span>'}).join('')+(nContra?'<span class="chip rel-chip rel-widersprechend">Mit Widerspruchskandidaten: '+nContra+'</span>':'')+'</div>'+
   ((r.links.length||r.mentions.length||r.hashtags.length)?'<p class="note" style="margin-top:8px">'+[r.links.length?r.links.length+(r.links.length===1?' Link':' Links')+' entfernt':'',r.mentions.length?'Erwähnt: '+r.mentions.map(function(m){return '@'+esc(m)}).join(', '):'',r.hashtags.length?'Hashtags: '+r.hashtags.map(esc).join(', '):''].filter(Boolean).join(' · ')+'</p>':'')+'</div>';
+ if(kiOn())h+='<button class="btn block ki-btn" data-act="ki-start" data-v="pruefen">'+ic('copy',18)+'KI-Auftrag erstellen (ganzer Text)</button>';
  h+=S.slice(0,CLAIM_SHOW).map(function(st,i){
   var R=REL[i],found=R?Analyse.REL_ORDER.reduce(function(a,k){return a.concat(R.groups[k])},[]):[];
   var Q=Analyse.openQuestions(st,found.map(function(x){return {status:x.status}}),function(s){return STATUS[s]||s});
@@ -949,7 +950,7 @@ function viewReply(){
  '<div class="sec"><div class="sec-h"><h2 id="rselh">Verwendete Einträge</h2>'+(ui.rsel.length?'<button class="link" data-act="reply-clear">Alle entfernen</button>':'')+'</div><div id="rsel" class="stack"></div></div>'+
  '<div class="sec"><h2>Eintrag hinzufügen</h2><label class="search">'+ic('search',18)+'<input id="rq" type="search" placeholder="Einträge und Karten durchsuchen" value="'+esc(ui.rq)+'" autocomplete="off" aria-label="Einträge suchen"></label><div id="radd" class="stack"></div></div>'+
  '<div class="sec"><h2>Stil</h2><div class="seg" id="rstyle">'+Object.keys(Analyse.STYLES).map(function(k){return '<button data-act="reply-style" data-v="'+k+'" aria-pressed="'+(ui.rstyle===k)+'">'+esc(Analyse.STYLES[k].replace(' und ',' & '))+'</button>'}).join('')+'</div></div>'+
- '<div id="rdraft"></div>'}
+ '<div id="rdraft"></div>'+(kiOn()?'<button class="btn block ki-btn" style="margin-top:10px" data-act="ki-start" data-v="antwort">'+ic('copy',18)+'KI-Auftrag erstellen (Antwort formulieren lassen)</button>':'')}
 function paintReply(){
  var sel=$('#rsel');if(!sel)return;
  var items=replyItems();
@@ -984,6 +985,71 @@ function suggestReply(){
  var added=0;['widersprechend','relativierend','unterstuetzend','ergaenzend'].forEach(function(k){R.groups[k].forEach(function(x){var key=replyKey(x.kind,x.id);ui.rrel[key]=k;if(ui.rsel.indexOf(key)<0&&ui.rsel.length<6){ui.rsel.push(key);added++}})});
  render();toast(added?added+(added===1?' Eintrag vorgeschlagen':' Einträge vorgeschlagen'):'Keine passenden Einträge gefunden. Füge selbst welche hinzu.')}
 function replyFromClaim(n){var st=claimOf(n);if(!st)return;ui.rclaim=st.text;ui.rsel=[];ui.rrel={};ui.dmode='antwort';suggestReply();window.scrollTo(0,0)}
+
+/* ---------- KI-Erweiterung, Stufe 1: Prompt kopieren (Phase 4B, Etappe 1) ----------
+ * Standardmäßig AUS. DebateBase sendet nichts: Der Prompt wird nur angezeigt
+ * und auf deinen Tipp in die Zwischenablage kopiert. */
+function kiOn(){return Repo.db&&Repo.db.settings.ki===true}
+var kiDraft=null;
+function kiLog(){var l=Repo.db.meta.kiLog;return Array.isArray(l)?l:[]}
+/* Einträge, Karten und Quellen für den Prompt – nur die nötigen Felder */
+function kiData(keys){
+ var E=[],A=[],S={};
+ keys.forEach(function(key){var p=replySplit(key),o=Repo.get(p[0],p[1]);if(!o)return;
+  (o.sourceIds||[]).forEach(function(s){if(Repo.get('sources',s))S[s]=1});
+  if(p[0]==='args')A.push({id:o.id,title:o.title,status:o.status,claim:o.claim,counter:o.counter,sourceIds:(o.sourceIds||[]).filter(function(s){return S[s]})});
+  else E.push({id:o.id,title:o.title,type:o.type,status:o.status,claimCore:o.claimCore,description:o.description,sourceIds:(o.sourceIds||[]).filter(function(s){return S[s]})})});
+ var src=Object.keys(S).map(function(s){var x=Repo.get('sources',s);return {id:x.id,title:x.title,publisher:x.publisher,year:x.year,kind:x.kind}});
+ return {entries:E,args:A,sources:src}}
+function kiPrompt(){
+ var d=kiDraft,keys=d.keys.filter(function(k){return d.sel[k]});
+ var text=d.keep?d.original:d.cleaned;
+ return KI.buildPrompt(kiData(keys),{task:d.task,text:text,style:d.style,typeLabel:function(t){return TYPES[t]||t},statusLabel:function(s){return STATUS[s]||s},sourceKinds:SKINDS})}
+/* Startet die Vorschau. task: 'pruefen' (ganzer Text aus „Behauptung prüfen“) oder 'antwort' */
+function kiStart(task){
+ var original,keys=[];
+ if(task==='pruefen'){
+  if(!ui.cres){toast('Bitte zuerst analysieren');return}
+  original=ui.ctext;
+  var opts={synIndex:synIdx(),ltypes:LTYPES,statusLabel:function(s){return STATUS[s]||s},typeLabel:function(x){return TYPES[x]||x}};
+  ui.cres.statements.forEach(function(st){if(st.kind==='fragment')return;var R=Analyse.relate(st.text,Repo.db,opts);
+   Analyse.REL_ORDER.forEach(function(k){R.groups[k].forEach(function(x){var key=replyKey(x.kind,x.id);if(keys.indexOf(key)<0)keys.push(key)})})});
+ }else{
+  original=ui.rclaim;keys=ui.rsel.slice();
+  if(!String(original||'').trim()&&!keys.length){toast('Bitte zuerst eingeben, worauf du antwortest, oder Einträge wählen');return}
+ }
+ keys=keys.slice(0,15);
+ var c=Analyse.cleanText(original||''),hasExtras=!!(c.links.length||c.mentions.length);
+ var sel={};keys.forEach(function(k){sel[k]=true});
+ kiDraft={task:task,original:String(original||'').trim(),cleaned:c.text,hasExtras:hasExtras,keys:keys,sel:sel,keep:false,style:Analyse.STYLES[ui.rstyle]};
+ kiSheet()}
+function kiSheet(){
+ var d=kiDraft,P=kiPrompt();
+ openSheet(sheetHead(d.task==='pruefen'?'KI-Auftrag: Text prüfen':'KI-Auftrag: Antwort formulieren')+
+ '<div class="card hint-rules"><p><b>DebateBase sendet nichts.</b> Du siehst hier den vollständigen Text. Erst „Prompt kopieren“ legt ihn in die Zwischenablage; dann fügst du ihn selbst in eine KI deiner Wahl ein. Eigene Notizen und Schlussfolgerungen sind nie enthalten.</p></div>'+
+ '<div class="sec"><h2>Mitgeschickte Einträge ('+d.keys.filter(function(k){return d.sel[k]}).length+' von '+d.keys.length+')</h2>'+
+ (d.keys.length?'<div class="pick" id="ki-items">'+d.keys.map(function(k){var p=replySplit(k),o=Repo.get(p[0],p[1]);if(!o)return '';
+  return '<label><input type="checkbox" name="ki-item" value="'+esc(k)+'"'+(d.sel[k]?' checked':'')+'><span>'+esc(o.title)+' <small style="color:var(--muted)">'+(p[0]==='args'?'Karte':esc(TYPES[o.type]||o.type))+' · '+esc(STATUS[o.status]||o.status)+'</small></span></label>'}).join('')+'</div>':'<p class="note">Keine passenden Einträge. Die KI bekommt nur den Text.</p>')+'</div>'+
+ (d.hasExtras?'<label class="checkline"><input type="checkbox" id="ki-keep"'+(d.keep?' checked':'')+'> @-Namen und Links aus dem Text mitschicken</label>':'')+
+ '<div class="field"><label for="ki-prompt">Vorschau: genau dieser Text wird kopiert</label><textarea class="mono" id="ki-prompt" readonly>'+esc(P.prompt)+'</textarea><span class="note" id="ki-count">'+P.chars.toLocaleString('de-DE')+' Zeichen</span></div>'+
+ '<div class="btns"><button class="btn" data-act="close">Abbrechen</button><button class="btn primary" data-act="ki-copy">'+ic('copy',18)+'Prompt kopieren</button></div>'+
+ '<p class="note">Bitte die KI, genau im vorgegebenen Format zu antworten. Das Einfügen der Antwort in DebateBase folgt in der nächsten Etappe.</p>')}
+function kiRefresh(){if(!kiDraft)return;var P=kiPrompt(),t=$('#ki-prompt');if(t){t.value=P.prompt;$('#ki-count').textContent=P.chars.toLocaleString('de-DE')+' Zeichen'}
+ var h=document.querySelector('#sheet .sec h2');if(h)h.textContent='Mitgeschickte Einträge ('+kiDraft.keys.filter(function(k){return kiDraft.sel[k]}).length+' von '+kiDraft.keys.length+')'}
+function kiCopy(){
+ if(!kiDraft)return;var P=kiPrompt();
+ copy(P.prompt,'Prompt kopiert. Jetzt in eine KI deiner Wahl einfügen.');
+ var log=kiLog().concat([{at:Date.now(),task:P.task,chars:P.chars,entries:P.counts.entries,args:P.counts.args,sources:P.counts.sources,extras:!!kiDraft.keep}]).slice(-50);
+ Repo.setMeta('kiLog',log)}
+function kiSection(){
+ var on=kiOn(),L=kiLog();
+ return '<section class="sec" id="sec-ki"><h2>KI-Erweiterung (optional)</h2><div class="card">'+
+ '<p style="margin:0 0 8px">Erzeugt einen Prompt, den du selbst in eine KI deiner Wahl kopierst. DebateBase sendet nichts ins Internet und braucht keine Zugangsdaten. Ohne KI funktioniert alles wie bisher.</p>'+
+ '<div class="seg" style="grid-template-columns:repeat(2,1fr)">'+[[false,'Aus'],[true,'An']].map(function(p){return '<button data-act="ki-toggle" data-v="'+(p[0]?'an':'aus')+'" aria-pressed="'+(on===p[0])+'">'+p[1]+'</button>'}).join('')+'</div>'+
+ (on?'<p class="note" style="margin-top:8px">Die Knöpfe „KI-Auftrag erstellen“ erscheinen unter „Behauptung prüfen“ und „Antwort entwerfen“.</p>':'')+
+ '<dl style="margin-top:10px"><dt>Kopierte Aufträge</dt><dd id="ki-logcount">'+L.length+'</dd>'+(L.length?'<dt>Zuletzt</dt><dd>'+fmtSaved(L[L.length-1].at)+' ('+(L[L.length-1].task==='pruefen'?'Text prüfen':'Antwort')+', '+L[L.length-1].chars+' Zeichen)</dd>':'')+'</dl>'+
+ (L.length?'<button class="btn block" style="margin-top:8px" data-act="ki-log-clear">Protokoll löschen</button>':'')+
+ '<p class="note" style="margin-top:8px">Das Protokoll liegt nur auf diesem Gerät und hält fest, wann du welchen Auftrag kopiert hast.</p></div></section>'}
 
 /* ---------- Diskussionsmodus ---------- */
 function viewDisc(){
@@ -1068,6 +1134,10 @@ document.addEventListener('click',function(ev){
   case 'reply-copy':var dr=currentDraft();if(dr)copy(dr.full,'Entwurf mit Belegen kopiert');break;
   case 'reply-copyx':var dx=currentDraft();if(dx)copy(dx.x,dx.unsupported?'Kopiert. Achtung: enthält nicht belegte Aussagen':'Text für X kopiert');break;
   case 'check-reply':replyFromClaim(v);break;
+  case 'ki-start':if(v==='antwort'){var rc=$('#rclaim');if(rc)ui.rclaim=rc.value}kiStart(v==='antwort'?'antwort':'pruefen');break;
+  case 'ki-copy':kiCopy();break;
+  case 'ki-toggle':Repo.setSetting('ki',v==='an').then(function(){render();toast(v==='an'?'KI-Erweiterung eingeschaltet':'KI-Erweiterung ausgeschaltet')});break;
+  case 'ki-log-clear':if(armed(b,'Wirklich löschen?'))Repo.setMeta('kiLog',[]).then(function(){render();toast('Protokoll gelöscht')});break;
   case 'check-run':ui.ctext=$('#ctext').value;runCheck();break;
   case 'check-clear':ui.ctext='';ui.cpost='';ui.cres=null;render();break;
   case 'check-post':var cpp=Repo.get('posts',id);if(cpp){ui.ctext=cpp.text||'';ui.cpost=id;ui.cres=Analyse.analyzeClaims(ui.ctext);render()}break;
@@ -1116,6 +1186,7 @@ document.addEventListener('input',function(ev){var i=ev.target.id;
 document.addEventListener('change',function(ev){var i=ev.target.id,v=ev.target.value;
  if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}else if(i==='s-coi'){var cf=$('#s-conflicts-f');if(cf)cf.hidden=v!=='ja'}
  else if(i==='mig-file'&&ev.target.files[0]){var fl=ev.target.files[0],r=new FileReader();r.onload=function(){mig.text=String(r.result);mig.fileName=fl.name+' ('+Math.round(fl.size/1024)+' KB)';mig.error='';migRender()};r.onerror=function(){mig.error='Die Datei konnte nicht gelesen werden.';migRender()};r.readAsText(fl)}
+ else if(ev.target.name==='ki-item'&&kiDraft){kiDraft.sel[v]=ev.target.checked;kiRefresh()}else if(i==='ki-keep'&&kiDraft){kiDraft.keep=ev.target.checked;kiRefresh()}
  else if(ev.target.name==='mig-mode'){mig.mode=v;migRender(true)}else if(ev.target.name==='mig-conflict'){mig.conflict=v;migRender(true)}});
 document.addEventListener('submit',function(ev){ev.preventDefault();var f=ev.target,k=f.dataset.form;if(k==='entry')saveEntry(f);else if(k==='source')saveSource(f);else if(k==='arg')saveArg(f);else if(k==='link')saveLink(f);else if(k==='post')savePost(f,ev.submitter&&ev.submitter.value)});
 window.addEventListener('hashchange',route);

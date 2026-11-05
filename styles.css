@@ -216,3 +216,8 @@ details.eval summary{cursor:pointer;padding:2px 0}
 .chip.over{color:var(--st-widerlegt);border-color:var(--st-widerlegt)}
 .row.sub{margin-left:18px;width:calc(100% - 18px);padding-top:6px;padding-bottom:6px}
 .lk.rel-widersprechend .lk-main,.lk.rel-relativierend .lk-main,.lk.rel-unterstuetzend .lk-main,.lk.rel-ergaenzend .lk-main{border-left-color:var(--rc)}
+
+/* Phase 4B, Etappe 1: KI-Auftrag */
+.checkline{display:flex;gap:8px;align-items:center;font-size:.875rem;margin:4px 0}
+#ki-prompt{min-height:220px;font-size:.75rem}
+.ki-btn{border-style:dashed}
