@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.8.0';
+var APP_VERSION='3.9.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -174,7 +174,7 @@ function checkIntegrity(){
  return iss}
 
 /* ---------- Hilfen ---------- */
-var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,dmode:'suche',ctext:'',cpost:'',cres:null,rclaim:'',rsel:[],rrel:{},rstyle:'sachlich',rq:'',focusImport:false};
+var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,dmode:'suche',ctext:'',cpost:'',cres:null,rclaim:'',rsel:[],rrel:{},rstyle:'sachlich',rq:'',qtext:'',pendingKi:false,focusImport:false};
 var ROUTES=[['dashboard','Dashboard','Start','home','Übersicht über deine Wissensdatenbank'],['wissen','Wissensbibliothek','Wissen','book','Fakten, Definitionen, Studien und mehr'],['argumente','Argumentationsarchiv','Argumente','scale','Behauptungen mit Gegenargumenten'],['quellen','Quellenarchiv','Quellen','doc','Belege und Fundstellen'],['diskussion','Diskussionsmodus','Diskussion','chat','Schnell nachschlagen und kopieren'],['einstellungen','Einstellungen','Optionen','sliders','Darstellung und Daten']];
 function norm(s){return String(s||'').toLowerCase()}
 function matches(hay,q){var ts=norm(q).split(/\s+/).filter(Boolean),h=norm(hay);return ts.every(function(t){return h.indexOf(t)>=0})}
@@ -839,7 +839,7 @@ function viewDashboard(){
  var recent=[].concat(E.map(function(o){return {k:'Wissen',a:'open-entry',o:o,t:o.created}}),S.map(function(o){return {k:'Quelle',a:'open-source',o:o,t:o.created}}),A.map(function(o){return {k:'Argument',a:'open-arg',o:o,t:o.created}})).sort(function(a,b){return b.t-a.t}).slice(0,6);
  var cnt={};E.forEach(function(e){cnt[e.status]=(cnt[e.status]||0)+1});
  var keys=Object.keys(STATUS).filter(function(k){return cnt[k]});
- return inboxCard()+kiDashCard()+welcomeCard()+installCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
+ return quickCard()+inboxCard()+kiDashCard()+welcomeCard()+installCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
  '<section class="sec"><h2>Neu anlegen</h2><div class="actions"><button class="btn primary" data-act="new-entry">'+ic('plus',18)+'Neuer Eintrag</button><button class="btn" data-act="new-source">'+ic('plus',18)+'Neue Quelle</button><button class="btn" data-act="new-arg">'+ic('plus',18)+'Neue Karte</button><button class="btn" data-act="new-research">'+ic('search',18)+'Neue Recherche</button><button class="btn block" style="grid-column:1/-1" data-act="new-post">'+ic('link',18)+'X-Beitrag erfassen</button></div></section>'+
  '<section class="sec"><div class="sec-h"><h2>Offene Recherchen ('+open.length+')</h2></div>'+(open.length?open.map(function(e){return '<button class="row" data-act="open-entry" data-id="'+esc(e.id)+'"><div><b>'+esc(e.title)+'</b><small>'+esc(TYPES[e.type]||e.type)+(e.topic?' · '+esc(e.topic):'')+'</small></div>'+stChip(e.status)+'</button>'}).join(''):empty('Keine offenen Recherchen. Offene Fragen und Einträge „In Prüfung“ erscheinen hier.'))+'</section>'+
  (recent.length?'<section class="sec"><h2>Zuletzt hinzugefügt</h2>'+recent.map(function(r){return '<button class="row" data-act="'+r.a+'" data-id="'+esc(r.o.id)+'"><span class="kind">'+r.k+'</span><div><b>'+esc(r.o.title)+'</b><small>'+rel(r.t)+'</small></div></button>'}).join('')+'</section>':'')+
@@ -1155,6 +1155,26 @@ function kiDoneSheet(){
  (R.sources.length?'<div class="sec"><h2>Quellen</h2>'+R.sources.map(function(s){return row('open-source',s,esc(s.kind))}).join('')+'</div>':'')+
  '<div class="btns"><button class="btn" data-act="ki-imp-reset">Weitere KI-Antwort einfügen</button><button class="btn primary" data-act="close">Fertig</button></div>')}
 
+/* ---------- Dashboard: Schnellprüfung mit KI-Anfrage ----------
+ * Ein Feld „Behauptung eingeben“. „KI-Anfrage erstellen“ springt zu
+ * Diskussion → Behauptung prüfen, analysiert und öffnet die Prompt-Vorschau. */
+function quickCard(){
+ var on=kiOn();
+ return '<section class="card quick" id="quick"><h3>Behauptung prüfen</h3>'+
+ '<div class="field"><textarea class="sm" id="qtext" aria-label="Behauptung oder X-Beitrag" placeholder="Behauptung oder X-Beitrag eingeben">'+esc(ui.qtext)+'</textarea></div>'+
+ (on?'<button class="btn primary block" data-act="quick-ki">'+ic('copy',18)+'KI-Anfrage erstellen</button>'+
+   '<div class="btns"><button class="btn" data-act="quick-check">'+ic('search',18)+'Ohne KI prüfen</button><button class="btn" data-act="ki-imp-open">'+ic('plus',18)+'KI-Antwort einfügen</button></div>'+
+   '<p class="note">Die App analysiert die Behauptung und bereitet einen Prompt für eine KI deiner Wahl vor. Gesendet wird nichts.</p>'
+  :'<button class="btn primary block" data-act="quick-check">'+ic('search',18)+'Behauptung prüfen</button>'+
+   '<p class="note">Mit KI-Unterstützung prüfen: <button class="link" data-act="quick-ki-on">KI-Erweiterung einschalten</button></p>')+
+ '</section>'}
+function quickGo(withKi){
+ var t=$('#qtext'),text=String(t?t.value:ui.qtext).trim();
+ if(!text){toast('Bitte zuerst eine Behauptung eingeben');if(t)t.focus();return}
+ ui.ctext=text;ui.cpost='';ui.cres=Analyse.analyzeClaims(text);ui.dmode='pruefen';ui.qtext='';
+ ui.pendingKi=!!withKi&&kiOn();
+ if(location.hash==='#diskussion')route();else location.hash='diskussion'}
+
 /* ---------- Diskussionsmodus ---------- */
 function viewDisc(){
  if(ui.dmode==='pruefen')return discSeg()+viewCheck();
@@ -1195,7 +1215,8 @@ function render(){
  if(R[0]==='wissen')paintList();if(R[0]==='argumente')paintArgs();if(R[0]==='quellen')paintSources();if(R[0]==='diskussion'){if(ui.dmode==='pruefen')paintCheck();else if(ui.dmode==='antwort')paintReply();else paintDisc()}
  if(R[0]==='einstellungen'){paintUsage()}
  applyTheme()}
-function route(){var h=location.hash.slice(1);ui.route=ROUTES.some(function(r){return r[0]===h})?h:'dashboard';closeSheet();render();if(!ui.focusImport)window.scrollTo(0,0)}
+function route(){var h=location.hash.slice(1);ui.route=ROUTES.some(function(r){return r[0]===h})?h:'dashboard';closeSheet();render();if(!ui.focusImport)window.scrollTo(0,0);
+ if(ui.pendingKi&&ui.route==='diskussion'){ui.pendingKi=false;kiStart('pruefen')}}
 
 /* ---------- Ereignisse ---------- */
 function delDone(kind,id,msg){var c={entry:'entries',source:'sources',arg:'args'}[kind];Repo.remove(c,id).then(function(){closeSheet();render();toast(msg)})}
@@ -1244,6 +1265,9 @@ document.addEventListener('click',function(ev){
   case 'ki-imp-check':kiImportCheck();break;
   case 'ki-imp-reset':kiImp={text:'',error:'',notes:[],plan:null,choice:null};kiImpSheet();break;
   case 'ki-apply':kiApply();break;
+  case 'quick-ki':quickGo(true);break;
+  case 'quick-check':quickGo(false);break;
+  case 'quick-ki-on':ui.qtext=($('#qtext')||{}).value||ui.qtext;location.hash='einstellungen';setTimeout(function(){var k=$('#sec-ki');if(k&&k.scrollIntoView)k.scrollIntoView({block:'start'})},60);break;
   case 'goto-ki-args':ui.aq='KI-Vorschlag';if(location.hash==='#argumente')render();else location.hash='argumente';break;
   case 'goto-ki':ui.q='KI-Vorschlag';ui.type=ui.topic=ui.status='';if(location.hash==='#wissen')render();else location.hash='wissen';break;
   case 'ki-ans-copy':if(kiImp.plan&&kiImp.plan.answer)copy(kiImp.plan.answer,'Antworttext kopiert');break;
@@ -1293,7 +1317,7 @@ document.addEventListener('keydown',function(ev){
  if(ev.key==='Escape'&&!$('#overlay').hidden){closeSheet();return}
  if((ev.key==='Enter'||ev.key===' ')&&ev.target.getAttribute&&ev.target.getAttribute('role')==='button'){ev.preventDefault();ev.target.click()}});
 document.addEventListener('input',function(ev){var i=ev.target.id;
- if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}else if(i==='ctext'){ui.ctext=ev.target.value}else if(i==='rclaim'){ui.rclaim=ev.target.value;paintDraft()}else if(i==='rq'){ui.rq=ev.target.value;paintReplyAdd()}else if(i==='ki-answer'){kiImp.text=ev.target.value}});
+ if(i==='qtext'){ui.qtext=ev.target.value}else if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}else if(i==='ctext'){ui.ctext=ev.target.value}else if(i==='rclaim'){ui.rclaim=ev.target.value;paintDraft()}else if(i==='rq'){ui.rq=ev.target.value;paintReplyAdd()}else if(i==='ki-answer'){kiImp.text=ev.target.value}});
 document.addEventListener('change',function(ev){var i=ev.target.id,v=ev.target.value;
  if(kiImpChange(ev.target))return;
  if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}else if(i==='s-coi'){var cf=$('#s-conflicts-f');if(cf)cf.hidden=v!=='ja'}

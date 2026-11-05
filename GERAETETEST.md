@@ -148,6 +148,14 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] O6 Optionen → Automatische Sicherungen: „Vor Übernahme einer KI-Antwort“ ist vorhanden. Wiederherstellen (zweimal tippen) → Stand vor der Übernahme.
 - [ ] O7 Optionen → Datenprüfung: keine Auffälligkeiten.
 
+## P. Dashboard: Behauptung prüfen (ab Version 3.9.0)
+
+- [ ] P1 Ganz oben auf dem Start-Bildschirm steht die Karte „Behauptung prüfen“.
+- [ ] P2 KI-Erweiterung aus: Knopf „Behauptung prüfen“ und Link „KI-Erweiterung einschalten“ (führt zu den Optionen, schaltet aber nicht selbst ein).
+- [ ] P3 KI-Erweiterung an: Behauptung eingeben → **KI-Anfrage erstellen** → Sprung zu Diskussion → Behauptung prüfen, Analyse sichtbar, Prompt-Vorschau offen → „Prompt kopieren“.
+- [ ] P4 „Ohne KI prüfen“ springt ebenfalls, aber ohne Prompt-Fenster.
+- [ ] P5 „KI-Antwort einfügen“ auf dem Dashboard öffnet das Einfügen-Fenster.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

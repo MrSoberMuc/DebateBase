@@ -242,3 +242,10 @@ details.eval summary{cursor:pointer;padding:2px 0}
 /* Phase 4B, Etappe 3: Kennzeichnung KI-Vorschlag */
 .chip.ki-chip{background:transparent;border:1px dashed var(--accent);color:var(--accent)}
 .ki-note{margin:0 0 4px;padding:6px 10px;border-left:3px dashed var(--accent)}
+
+/* Dashboard: Schnellprüfung */
+.card.quick{border:2px solid var(--accent);display:flex;flex-direction:column;gap:10px}
+.card.quick h3{margin:0}
+.card.quick textarea{min-height:76px}
+.card.quick .btns{margin:0}
+.card.quick .note{margin:0}
