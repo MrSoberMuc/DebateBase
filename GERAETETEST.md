@@ -103,6 +103,16 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] K6 Ein Ergebnis antippen → der gespeicherte Eintrag bzw. die Quelle öffnet sich.
 - [ ] K7 Einen echten X-Beitrag prüfen und notieren, welche Zusammenhänge stimmen und welche nicht.
 
+## L. Phase 4, Etappe 5: Antwort entwerfen (ab Version 3.5.0)
+
+- [ ] L1 Diskussion: drei Umschalter „Suchen“, „Behauptung prüfen“, „Antwort entwerfen“; alle passen auf den Bildschirm.
+- [ ] L2 „Antwort entwerfen“: *Die EU hat 28 Mitgliedstaaten.* eingeben → „Passende Einträge vorschlagen“ → der Eintrag erscheint mit „widerspricht“; darunter ein Entwurf mit [1] und „Belege:“.
+- [ ] L3 Zwischen den Stilen „Sachlich“, „Argumentativ“, „Kurz“ wechseln. „Kurz“ bleibt unter 280 Zeichen.
+- [ ] L4 Über „Eintrag hinzufügen“ die Karte „Abschreckung …“ hinzufügen → ihr Satz ist farbig als „nicht belegt“ markiert, oben steht „1 Aussage nicht belegt“.
+- [ ] L5 „Für X kopieren“ und in X einfügen: ohne Nummern, mit „Quellen: …“. „Mit Belegen kopieren“ in eine Notiz einfügen: mit Nummern und Belegliste.
+- [ ] L6 In „Behauptung prüfen“ bei einer Aussage „Antwort entwerfen“ → Wechsel zu „Antwort entwerfen“ mit vorgeschlagenen Einträgen.
+- [ ] L7 Einen echten Entwurf für eine X-Diskussion erstellen und notieren, was am Text gut ist und was stört.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

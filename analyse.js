@@ -724,6 +724,111 @@
       negated: stNeg, numbers: stNum };
   }
 
+  /* =====================================================================
+   * Antwortassistent (Phase 4, Etappe 5)
+   * Baut Antwortentwürfe ausschließlich aus Texten gespeicherter Einträge,
+   * Argumentationskarten und Quellen. Es entstehen keine neuen Fakten:
+   * Jeder inhaltliche Satz stammt aus einem gespeicherten Datensatz und
+   * trägt dessen Belegnummer. Nicht ausreichend belegte Sätze werden markiert.
+   * Nur die Überleitungen (z. B. „Erstens“) und der Einleitungssatz kommen
+   * aus festen Vorlagen; der Einleitungssatz folgt der Einordnung aus
+   * der Zusammenhangsanalyse und ist als Kandidat gekennzeichnet.
+   * ===================================================================== */
+  var STYLES = { sachlich: 'Sachlich und neutral', argument: 'Argumentativ und präzise', kurz: 'Kurz und pointiert' };
+  var REL_RANK = { widersprechend: 0, relativierend: 1, unterstuetzend: 2, ergaenzend: 3, thematisch: 4 };
+  var BACKED = { belegt: 1, teilweise: 1, widerlegt: 1, veraltet: 1 };
+  function firstSentences(t, n) { return sentences(String(t || '').replace(/\s+/g, ' ').trim()).slice(0, n || 1).join(' '); }
+  function endDot(t) { t = String(t || '').trim(); return /[.!?…“”"]$/.test(t) ? t : t + '.'; }
+  function clip(t, max) { t = String(t || '').trim(); if (t.length <= max) return t; var c = t.slice(0, max - 1); var sp = c.lastIndexOf(' '); return (sp > max * 0.6 ? c.slice(0, sp) : c).replace(/[,;:\s]+$/, '') + '…'; }
+
+  /* Der inhaltliche Satz eines Datensatzes – immer aus seinem eigenen Text */
+  function coreOf(it, SL) {
+    if (it.kind === 'args') return { pre: '', text: firstSentences(it.counter, 2) || it.title, from: 'Gegenargument der Karte' };
+    var claimLike = it.type === 'behauptung' || it.type === 'meinung';
+    if (claimLike && (it.status === 'widerlegt' || it.status === 'veraltet' || it.status === 'umstritten')) {
+      var pre = it.status === 'widerlegt' ? 'Die Behauptung „' + it.title + '“ gilt als widerlegt: '
+        : it.status === 'veraltet' ? 'Die Angabe „' + it.title + '“ ist veraltet: '
+        : 'Ob „' + it.title + '“ zutrifft, ist umstritten: ';
+      return { pre: pre, text: firstSentences(it.description, 2) || '', from: 'Beschreibung' };
+    }
+    if (it.claimCore) return { pre: '', text: it.claimCore, from: 'Kernaussage' };
+    return { pre: '', text: firstSentences(it.description, 1) || it.title, from: it.description ? 'Beschreibung' : 'Titel' };
+  }
+  function backing(it, SL) {
+    var n = (it.sources || []).length;
+    if (!n) return { ok: false, label: 'nicht belegt: keine Quelle verknüpft' };
+    if (BACKED[it.status]) return { ok: true, label: it.status === 'teilweise' ? 'teilweise belegt' : '' };
+    return { ok: false, label: 'nicht belegt: Prüfstatus „' + (SL ? SL(it.status) : it.status) + '“' };
+  }
+
+  /* input: { claim, items: [{ kind, id, title, type, status, claimCore, description, counter, rel,
+               sources: [{ title, publisher, year, url }] }], style, statusLabel }
+     Liefert { style, opener, parts: [{ n, text, ok, label }], refs, full, x, chars, unsupported } */
+  function draftReply(input) {
+    var SL = input.statusLabel, style = STYLES[input.style] ? input.style : 'sachlich';
+    var items = (input.items || []).slice().sort(function (a, b) { return (REL_RANK[a.rel] == null ? 3 : REL_RANK[a.rel]) - (REL_RANK[b.rel] == null ? 3 : REL_RANK[b.rel]); });
+    var refs = [], parts = [];
+    items.forEach(function (it) {
+      var c = coreOf(it, SL), b = backing(it, SL);
+      if (!String(c.text).trim()) return;
+      var n = refs.length + 1;
+      refs.push({ n: n, kind: it.kind, id: it.id, title: it.title, status: it.status, rel: it.rel, ok: b.ok, label: b.label, from: c.from, sources: it.sources || [] });
+      parts.push({ n: n, pre: c.pre, text: c.text, ok: b.ok, label: b.label, rel: it.rel });
+    });
+    var rels = {}; items.forEach(function (it) { rels[it.rel] = 1; });
+    var claim = String(input.claim || '').replace(/\s+/g, ' ').trim();
+    var opener = '', openerNote = '';
+    if (style === 'argument') {
+      opener = rels.widersprechend ? 'Das lässt sich so nicht halten.' : rels.relativierend ? 'Das ist zu pauschal.' : rels.unterstuetzend ? 'Das ist richtig.' : '';
+    } else if (style === 'kurz') {
+      opener = rels.widersprechend ? 'Stimmt so nicht.' : rels.relativierend ? 'Zu pauschal.' : rels.unterstuetzend ? 'Richtig.' : '';
+    } else if (claim) {
+      opener = 'Zur Aussage „' + clip(claim, 120).replace(/[.!?;:,]+$/, '') + '“:';
+    }
+    if (opener && style !== 'sachlich') openerNote = 'Einleitungssatz folgt der Einordnung der Zusammenhangsanalyse (Kandidat) – bitte prüfen.';
+
+    var ORD = ['Erstens', 'Zweitens', 'Drittens', 'Viertens', 'Fünftens'];
+    var sentence = function (p, i) {
+      var body = endDot(p.pre + p.text);
+      if (style === 'argument') body = (i < ORD.length ? ORD[i] : 'Außerdem') + ': ' + body;
+      return body;
+    };
+    var mark = function (p) { return ' [' + p.n + (p.label ? ' – ' + p.label : '') + ']'; };
+    var useParts = parts;
+    var srcTitles = []; refs.forEach(function (r) { r.sources.forEach(function (s) { if (srcTitles.indexOf(s.title) < 0) srcTitles.push(s.title); }); });
+
+    var x;
+    if (style === 'kurz') {
+      /* belegte Aussagen zuerst; so viel, wie in 280 Zeichen passt */
+      var ordered = parts.filter(function (p) { return p.ok; }).concat(parts.filter(function (p) { return !p.ok; }));
+      var first = ordered[0];
+      useParts = [];
+      if (first) {
+        var ref = refs[first.n - 1], src = ref.sources[0];
+        var tail = src ? ' Quelle: ' + clip(src.title, 70) : '';
+        var room = 280 - (opener ? opener.length + 1 : 0) - tail.length;
+        var body = clip(endDot(first.pre + first.text), Math.max(40, room));
+        useParts = [{ n: first.n, pre: '', text: body, ok: first.ok, label: first.label }];
+        x = (opener ? opener + ' ' : '') + body + tail;
+        var second = ordered[1];
+        if (second && second.ok) {
+          var add = ' ' + endDot(second.pre + second.text);
+          if (x.length + add.length <= 280) { x = (opener ? opener + ' ' : '') + body + add + tail; useParts.push({ n: second.n, pre: '', text: endDot(second.pre + second.text), ok: true, label: second.label }); }
+        }
+      } else x = opener;
+    } else {
+      x = [opener].concat(useParts.map(sentence)).filter(Boolean).join(style === 'argument' ? '\n' : ' ') + (srcTitles.length ? '\n\nQuellen: ' + srcTitles.join('; ') : '');
+    }
+    var usedN = useParts.map(function (p) { return p.n; });
+    var usedRefs = refs.filter(function (r) { return usedN.indexOf(r.n) >= 0; });
+    var full = [opener].concat(useParts.map(function (p, i) { return (style === 'kurz' ? endDot(p.text) : sentence(p, i)) + mark(p); })).filter(Boolean).join(style === 'argument' ? '\n' : ' ') +
+      (usedRefs.length ? '\n\nBelege:\n' + usedRefs.map(function (r) {
+        return '[' + r.n + '] ' + r.title + ' (' + (SL ? SL(r.status) : r.status) + ')' + (r.sources.length ? ' – Quelle: ' + r.sources.map(function (s) { return [s.title, s.publisher, s.year].filter(Boolean).join(', ') + (s.url ? ' ' + s.url : ''); }).join('; ') : ' – keine Quelle');
+      }).join('\n') : '');
+    return { style: style, styleLabel: STYLES[style], opener: opener, openerNote: openerNote, parts: useParts, refs: usedRefs,
+      full: full, x: x || '', chars: (x || '').length, unsupported: useParts.filter(function (p) { return !p.ok; }).length };
+  }
+
   global.Analyse = {
     normalize: normalize,
     words: words,
@@ -745,6 +850,8 @@
     relate: relate,
     numbers: numbers,
     REL_ORDER: REL_ORDER,
-    REL_LABEL: REL_LABEL
+    REL_LABEL: REL_LABEL,
+    draftReply: draftReply,
+    STYLES: STYLES
   };
 })(typeof self !== 'undefined' ? self : this);

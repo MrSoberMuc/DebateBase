@@ -188,7 +188,8 @@ details.card[data-kind="skipped"] summary b{color:var(--danger)}
 details.eval summary{cursor:pointer;padding:2px 0}
 
 /* Phase 4, Etappe 3: Behauptung prüfen */
-#dseg{margin-bottom:2px;grid-template-columns:repeat(2,1fr)}
+#dseg{margin-bottom:2px;grid-template-columns:repeat(3,1fr)}
+#dseg button,#rstyle button{padding:4px 6px;line-height:1.2;font-size:.8125rem}
 .hint-rules p{margin:0;font-size:.8125rem}
 .claim{border-left:4px solid var(--cc,var(--line))}
 .card .claim-text{margin:10px 0 6px;color:var(--fg);font-size:1rem}
@@ -207,3 +208,11 @@ details.eval summary{cursor:pointer;padding:2px 0}
 .relrow .basis{display:block;font-size:.75rem;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
 .rel-widersprechend{--rc:var(--st-widerlegt)}.rel-unterstuetzend{--rc:var(--st-belegt)}.rel-relativierend{--rc:var(--st-pruefung)}.rel-ergaenzend{--rc:var(--accent)}.rel-thematisch{--rc:var(--muted)}.rel-quellen{--rc:var(--st-neu)}
 .chip.rel-chip{color:var(--rc);border:1px solid var(--rc);background:transparent}
+
+/* Phase 4, Etappe 5: Antwortassistent */
+.draft-text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:10px;color:var(--fg);line-height:1.5}
+.unb{background:color-mix(in srgb,var(--st-pruefung) 18%,transparent);color:var(--st-pruefung);border-radius:4px;padding:0 3px;font-size:.8125rem}
+.chip.unb-chip{color:var(--st-pruefung);border:1px solid var(--st-pruefung);background:transparent}
+.chip.over{color:var(--st-widerlegt);border-color:var(--st-widerlegt)}
+.row.sub{margin-left:18px;width:calc(100% - 18px);padding-top:6px;padding-bottom:6px}
+.lk.rel-widersprechend .lk-main,.lk.rel-relativierend .lk-main,.lk.rel-unterstuetzend .lk-main,.lk.rel-ergaenzend .lk-main{border-left-color:var(--rc)}

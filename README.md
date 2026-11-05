@@ -92,6 +92,17 @@ Bei **Behauptung prüfen** zeigt DebateBase zu jeder Aussage, wie sie zu deinen 
 
 Gemeinsame Wörter allein ergeben nie einen Widerspruch, sondern „nur thematisch verwandt“. Alle Ergebnisse sind Hinweise nach festen Regeln, keine Urteile.
 
+### Antwort entwerfen (ab Version 3.5.0)
+
+Unter **Diskussion → Antwort entwerfen** entsteht ein Antwortentwurf **nur aus deinen gespeicherten Einträgen, Argumentationskarten und Quellen**:
+
+1. Optional eingeben, worauf du antwortest, und **Passende Einträge vorschlagen** tippen. Die Auswahl kommt aus der Zusammenhangsanalyse. Oder Einträge über die Suche selbst hinzufügen. Auch aus **Behauptung prüfen** gibt es bei jeder Aussage den Knopf **Antwort entwerfen**.
+2. Stil wählen: **Sachlich und neutral**, **Argumentativ und präzise** (Erstens, Zweitens …) oder **Kurz und pointiert** (höchstens 280 Zeichen).
+3. Jeder Satz stammt aus einem gespeicherten Eintrag (Kernaussage, Beschreibung oder Gegenargument) und trägt eine Belegnummer [1]. Sätze ohne Quelle oder mit ungeprüftem Status sind als **nicht belegt** markiert.
+4. **Für X kopieren** (ohne Nummern, mit „Quellen: …“) oder **Mit Belegen kopieren** (mit Nummern und Belegliste).
+
+Es entstehen keine neuen Fakten. Nur Überleitungen und der Einleitungssatz kommen aus festen Vorlagen. Der Entwurf wird nicht gespeichert. Prüfe und bearbeite ihn vor dem Posten.
+
 ## 3. X-Beiträge teilen
 
 Voraussetzung: DebateBase ist **installiert**.

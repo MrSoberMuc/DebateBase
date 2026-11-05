@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.4.0';
+var APP_VERSION='3.5.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -174,7 +174,7 @@ function checkIntegrity(){
  return iss}
 
 /* ---------- Hilfen ---------- */
-var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,dmode:'suche',ctext:'',cpost:'',cres:null,focusImport:false};
+var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,dmode:'suche',ctext:'',cpost:'',cres:null,rclaim:'',rsel:[],rrel:{},rstyle:'sachlich',rq:'',focusImport:false};
 var ROUTES=[['dashboard','Dashboard','Start','home','Übersicht über deine Wissensdatenbank'],['wissen','Wissensbibliothek','Wissen','book','Fakten, Definitionen, Studien und mehr'],['argumente','Argumentationsarchiv','Argumente','scale','Behauptungen mit Gegenargumenten'],['quellen','Quellenarchiv','Quellen','doc','Belege und Fundstellen'],['diskussion','Diskussionsmodus','Diskussion','chat','Schnell nachschlagen und kopieren'],['einstellungen','Einstellungen','Optionen','sliders','Darstellung und Daten']];
 function norm(s){return String(s||'').toLowerCase()}
 function matches(hay,q){var ts=norm(q).split(/\s+/).filter(Boolean),h=norm(hay);return ts.every(function(t){return h.indexOf(t)>=0})}
@@ -878,7 +878,7 @@ function paintSources(){var L=Repo.all('sources').filter(function(s){return !ui.
  * Zerlegt einen Text in Aussagen (analyse.js) und sucht passende gespeicherte
  * Einträge und Karten. Nichts wird automatisch gespeichert. */
 var CLAIM_SHOW=30;
-function discSeg(){return '<div class="seg" id="dseg">'+[['suche','Suchen'],['pruefen','Behauptung prüfen']].map(function(p){return '<button data-act="disc-mode" data-v="'+p[0]+'" aria-pressed="'+(ui.dmode===p[0])+'">'+p[1]+'</button>'}).join('')+'</div>'}
+function discSeg(){return '<div class="seg" id="dseg">'+[['suche','Suchen'],['pruefen','Behauptung prüfen'],['antwort','Antwort entwerfen']].map(function(p){return '<button data-act="disc-mode" data-v="'+p[0]+'" aria-pressed="'+(ui.dmode===p[0])+'">'+p[1]+'</button>'}).join('')+'</div>'}
 function viewCheck(){
  var P=Repo.all('posts').filter(function(p){return String(p.text||'').trim()}),cp=ui.cpost&&Repo.get('posts',ui.cpost);
  return '<div class="card hint-rules"><p><b>Regelbasierte Analyse, keine KI.</b> Die App zerlegt den Text an Satzzeichen und sucht nach Schlüsselwörtern und Zahlen. Sie versteht die Bedeutung nicht und erkennt keine Ironie. Alle Einordnungen sind Hinweise.</p></div>'+
@@ -909,7 +909,7 @@ function paintCheck(){
   (feats.length?'<ul class="feats">'+feats.map(function(f){return '<li><b>'+esc(f.label)+'</b> („'+esc(f.words.join('“, „'))+'“): '+esc(f.hint)+'</li>'}).join('')+'</ul>':'')+
   (R?relSection(R):'')+
   (Q.length?'<div class="sec"><h2>Offene Fragen</h2><ul class="openq">'+Q.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>':'')+
-  '<div class="btns" style="margin-top:10px"><button class="btn" data-act="check-copy" data-v="'+st.n+'">'+ic('copy',18)+'Kopieren</button><button class="btn" data-act="check-save" data-v="'+st.n+'">'+ic('plus',18)+'Als Eintrag speichern</button></div></article>'}).join('');
+  '<div class="btns" style="margin-top:10px"><button class="btn" data-act="check-copy" data-v="'+st.n+'">'+ic('copy',18)+'Kopieren</button><button class="btn" data-act="check-save" data-v="'+st.n+'">'+ic('plus',18)+'Als Eintrag speichern</button></div>'+(st.kind==='fragment'?'':'<button class="btn block" style="margin-top:8px" data-act="check-reply" data-v="'+st.n+'">'+ic('chat',18)+'Antwort entwerfen</button>')+'</article>'}).join('');
  if(S.length>CLAIM_SHOW)h+='<p class="note">'+(S.length-CLAIM_SHOW)+' weitere Aussagen nicht angezeigt. Bitte den Text kürzen.</p>';
  el.innerHTML=h}
 /* Zusammenhänge einer Aussage (Etappe 4): jede Zeile nennt ihre Grundlage */
@@ -932,9 +932,63 @@ function saveClaim(n){
  entryForm(null,{title:title,type:st.kind==='meinung'?'meinung':st.kind==='frage'?'frage':'behauptung',status:'neu',claimCore:st.text,description:st.sentence!==st.text?'Aus dem Satz: '+st.sentence:'',tags:(ui.cres.hashtags||[]).slice(0,5),postId:ui.cpost&&Repo.get('posts',ui.cpost)?ui.cpost:''})}
 function checkFromPost(id){var p=Repo.get('posts',id);if(!p)return;ui.dmode='pruefen';ui.ctext=p.text||'';ui.cpost=p.id;ui.cres=Analyse.analyzeClaims(ui.ctext);closeSheet();if(location.hash!=='#diskussion')location.hash='diskussion';else render()}
 
+/* ---------- Antwort entwerfen (Phase 4, Etappe 5) ----------
+ * Entwürfe entstehen nur aus gespeicherten Einträgen, Karten und Quellen
+ * (analyse.js: draftReply). Nichts wird gespeichert. */
+var REL_SHORTLBL={widersprechend:'widerspricht',relativierend:'relativiert',unterstuetzend:'stützt',ergaenzend:'ergänzt',thematisch:'verwandt'};
+function replyKey(k,id){return k+':'+id}
+function replySplit(key){var i=key.indexOf(':');return [key.slice(0,i),key.slice(i+1)]}
+function replyItems(){
+ return ui.rsel.map(function(key){var p=replySplit(key),o=Repo.get(p[0],p[1]);if(!o)return null;
+  return {kind:p[0],id:o.id,title:o.title,type:o.type,status:o.status,claimCore:o.claimCore,description:o.description,counter:o.counter,rel:ui.rrel[key]||'ergaenzend',
+   sources:(o.sourceIds||[]).map(function(s){return Repo.get('sources',s)}).filter(Boolean).map(function(s){return {id:s.id,title:s.title,publisher:s.publisher,year:s.year,url:s.url}})}}).filter(Boolean)}
+function viewReply(){
+ return '<div class="card hint-rules"><p><b>Entwürfe nur aus deinen gespeicherten Einträgen und Quellen.</b> Keine KI, keine neuen Fakten. Jeder Satz trägt eine Belegnummer; nicht belegte Sätze sind markiert. Prüfe und bearbeite den Entwurf vor dem Posten.</p></div>'+
+ '<div class="field"><label for="rclaim">Worauf antwortest du? (optional)</label><textarea class="sm" id="rclaim" placeholder="z. B. die Behauptung aus dem X-Beitrag">'+esc(ui.rclaim)+'</textarea></div>'+
+ '<button class="btn block" data-act="reply-suggest">'+ic('search',18)+'Passende Einträge vorschlagen</button>'+
+ '<div class="sec"><div class="sec-h"><h2 id="rselh">Verwendete Einträge</h2>'+(ui.rsel.length?'<button class="link" data-act="reply-clear">Alle entfernen</button>':'')+'</div><div id="rsel" class="stack"></div></div>'+
+ '<div class="sec"><h2>Eintrag hinzufügen</h2><label class="search">'+ic('search',18)+'<input id="rq" type="search" placeholder="Einträge und Karten durchsuchen" value="'+esc(ui.rq)+'" autocomplete="off" aria-label="Einträge suchen"></label><div id="radd" class="stack"></div></div>'+
+ '<div class="sec"><h2>Stil</h2><div class="seg" id="rstyle">'+Object.keys(Analyse.STYLES).map(function(k){return '<button data-act="reply-style" data-v="'+k+'" aria-pressed="'+(ui.rstyle===k)+'">'+esc(Analyse.STYLES[k].replace(' und ',' & '))+'</button>'}).join('')+'</div></div>'+
+ '<div id="rdraft"></div>'}
+function paintReply(){
+ var sel=$('#rsel');if(!sel)return;
+ var items=replyItems();
+ $('#rselh').textContent='Verwendete Einträge ('+items.length+')';
+ sel.innerHTML=items.length?items.map(function(it){var key=replyKey(it.kind,it.id),o=Repo.get(it.kind,it.id);
+  return '<div class="lk rel-'+esc(it.rel)+'"><button class="lk-main" data-act="open-item" data-k="'+it.kind+'" data-id="'+esc(it.id)+'"><small>'+(it.kind==='args'?'Argumentationskarte':esc(TYPES[it.type]||it.type))+(ui.rclaim.trim()&&ui.rrel[key]?' · '+REL_SHORTLBL[ui.rrel[key]]:'')+' · '+esc(STATUS[it.status]||it.status)+' · '+(it.sources.length?it.sources.length+(it.sources.length===1?' Quelle':' Quellen'):'keine Quelle')+'</small><b>'+esc(o.title)+'</b></button>'+
+  '<button class="icon-btn sm" data-act="reply-del" data-v="'+esc(key)+'" aria-label="Aus dem Entwurf entfernen">'+ic('x',18)+'</button></div>'}).join(''):'<p class="note">Noch keine Einträge gewählt. Tippe auf „Passende Einträge vorschlagen“ oder suche unten.</p>';
+ paintReplyAdd();paintDraft()}
+function paintReplyAdd(){
+ var el=$('#radd');if(!el)return;var q=ui.rq.trim();
+ if(!q){el.innerHTML='';return}
+ var docs=Repo.all('entries').map(function(o){return docFor('entries',o)}).concat(Repo.all('args').map(function(o){return docFor('args',o)}));
+ var r=Analyse.search(docs,q,{synIndex:synIdx()}),R=(r.full.length?r.full:r.partial).filter(function(x){return ui.rsel.indexOf(replyKey(x.doc.kind,x.doc.id))<0}).slice(0,8);
+ el.innerHTML=R.length?R.map(function(x){var o=x.doc.item;return '<button class="row" data-act="reply-add" data-v="'+esc(replyKey(x.doc.kind,o.id))+'"><div><b>'+esc(o.title)+'</b><small>'+(x.doc.kind==='args'?'Argumentationskarte':esc(TYPES[o.type]||o.type))+' · '+esc(STATUS[o.status]||o.status)+'</small></div><span class="chip tag">+ hinzufügen</span></button>'}).join(''):'<p class="note">Nichts gefunden.</p>'}
+function currentDraft(){var items=replyItems();if(!items.length)return null;return Analyse.draftReply({claim:ui.rclaim,items:items,style:ui.rstyle,statusLabel:function(s){return STATUS[s]||s}})}
+function paintDraft(){
+ var el=$('#rdraft');if(!el)return;var d=currentDraft();
+ if(!d){el.innerHTML=empty('Wähle mindestens einen Eintrag. Der Entwurf entsteht nur aus gespeicherten Inhalten.');return}
+ if(!d.parts.length){el.innerHTML=empty('Die gewählten Einträge enthalten keinen verwendbaren Text.');return}
+ var body=esc(d.full).replace(/\[(\d+) – ([^\]]+)\]/g,'<span class="unb">[$1 – $2]</span>');
+ el.innerHTML='<article class="card draft" id="draft"><div class="meta"><span class="chip">'+esc(d.styleLabel)+'</span><span class="chip tag'+(d.chars>280?' over':'')+'">'+d.chars+' Zeichen für X</span>'+(d.unsupported?'<span class="chip unb-chip">'+d.unsupported+(d.unsupported===1?' Aussage nicht belegt':' Aussagen nicht belegt')+'</span>':'')+'</div>'+
+ '<div class="draft-text">'+body+'</div>'+
+ (d.openerNote?'<p class="note">'+esc(d.openerNote)+'</p>':'')+
+ (d.chars>280?'<p class="note">Länger als 280 Zeichen: Für X kürzen, als Thread posten oder den Stil „Kurz und pointiert“ wählen.</p>':'')+
+ '<div class="btns" style="margin-top:10px"><button class="btn" data-act="reply-copy">'+ic('copy',18)+'Mit Belegen kopieren</button><button class="btn primary" data-act="reply-copyx">'+ic('copy',18)+'Für X kopieren</button></div></article>'+
+ '<div class="sec"><h2>Belege im Entwurf ('+d.refs.length+')</h2>'+d.refs.map(function(r){
+  return '<button class="row" data-act="open-item" data-k="'+r.kind+'" data-id="'+esc(r.id)+'"><div><b>['+r.n+'] '+esc(r.title)+'</b><small>Text aus: '+esc(r.from)+(r.label?' · '+esc(r.label):'')+'</small></div>'+stChip(r.status)+'</button>'+
+  r.sources.map(function(s){return '<button class="row sub" data-act="open-source" data-id="'+esc(s.id)+'"><div><small>Quelle zu ['+r.n+']</small><b>'+esc(s.title)+'</b><small>'+esc([s.publisher,s.year].filter(Boolean).join(', '))+'</small></div></button>'}).join('')}).join('')+'</div>'}
+function suggestReply(){
+ var t=String(ui.rclaim||'').trim();if(!t){toast('Bitte zuerst eingeben, worauf du antwortest');return}
+ var R=Analyse.relate(t,Repo.db,{synIndex:synIdx(),ltypes:LTYPES,statusLabel:function(s){return STATUS[s]||s},typeLabel:function(x){return TYPES[x]||x}});
+ var added=0;['widersprechend','relativierend','unterstuetzend','ergaenzend'].forEach(function(k){R.groups[k].forEach(function(x){var key=replyKey(x.kind,x.id);ui.rrel[key]=k;if(ui.rsel.indexOf(key)<0&&ui.rsel.length<6){ui.rsel.push(key);added++}})});
+ render();toast(added?added+(added===1?' Eintrag vorgeschlagen':' Einträge vorgeschlagen'):'Keine passenden Einträge gefunden. Füge selbst welche hinzu.')}
+function replyFromClaim(n){var st=claimOf(n);if(!st)return;ui.rclaim=st.text;ui.rsel=[];ui.rrel={};ui.dmode='antwort';suggestReply();window.scrollTo(0,0)}
+
 /* ---------- Diskussionsmodus ---------- */
 function viewDisc(){
  if(ui.dmode==='pruefen')return discSeg()+viewCheck();
+ if(ui.dmode==='antwort')return discSeg()+viewReply();
  var cnt={};Repo.all('entries').forEach(function(e){(e.tags||[]).forEach(function(t){cnt[t]=(cnt[t]||0)+1})});
  var top=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a]}).slice(0,8);
  return discSeg()+'<label class="search">'+ic('search',18)+'<input id="dq" type="search" placeholder="Stichwort aus der Diskussion" value="'+esc(ui.dq)+'" autocomplete="off" aria-label="Schnellsuche"></label>'+
@@ -968,7 +1022,7 @@ function render(){
  $('#nav').innerHTML='<div>'+ROUTES.map(function(r){return '<a href="#'+r[0]+'" aria-label="'+r[1]+'"'+(r[0]===ui.route?' aria-current="page"':'')+'>'+ic(r[3],22)+'<span>'+r[2]+'</span></a>'}).join('')+'</div>';
  var v={dashboard:viewDashboard,wissen:viewLibrary,argumente:viewArgs,quellen:viewSources,diskussion:viewDisc,einstellungen:viewSettings}[R[0]];
  $('#view').innerHTML=v();
- if(R[0]==='wissen')paintList();if(R[0]==='argumente')paintArgs();if(R[0]==='quellen')paintSources();if(R[0]==='diskussion'){if(ui.dmode==='pruefen')paintCheck();else paintDisc()}
+ if(R[0]==='wissen')paintList();if(R[0]==='argumente')paintArgs();if(R[0]==='quellen')paintSources();if(R[0]==='diskussion'){if(ui.dmode==='pruefen')paintCheck();else if(ui.dmode==='antwort')paintReply();else paintDisc()}
  if(R[0]==='einstellungen'){paintUsage()}
  applyTheme()}
 function route(){var h=location.hash.slice(1);ui.route=ROUTES.some(function(r){return r[0]===h})?h:'dashboard';closeSheet();render();if(!ui.focusImport)window.scrollTo(0,0)}
@@ -1005,7 +1059,15 @@ document.addEventListener('click',function(ev){
   case 'disc-only':ui.donly=!ui.donly;b.setAttribute('aria-pressed',ui.donly);paintDisc();break;
   case 'disc-tag':ui.dq=v;$('#dq').value=v;paintDisc();break;
   case 'disc-save':entryForm(null,{title:ui.dq.trim()});break;
-  case 'disc-mode':ui.dmode=v==='pruefen'?'pruefen':'suche';render();break;
+  case 'disc-mode':ui.dmode=v==='pruefen'||v==='antwort'?v:'suche';render();break;
+  case 'reply-suggest':ui.rclaim=$('#rclaim').value;suggestReply();break;
+  case 'reply-add':if(ui.rsel.indexOf(v)<0)ui.rsel.push(v);paintReply();break;
+  case 'reply-del':ui.rsel=ui.rsel.filter(function(x){return x!==v});paintReply();break;
+  case 'reply-clear':ui.rsel=[];ui.rrel={};render();break;
+  case 'reply-style':ui.rstyle=v;document.querySelectorAll('#rstyle button').forEach(function(x){x.setAttribute('aria-pressed',x.dataset.v===v)});paintDraft();break;
+  case 'reply-copy':var dr=currentDraft();if(dr)copy(dr.full,'Entwurf mit Belegen kopiert');break;
+  case 'reply-copyx':var dx=currentDraft();if(dx)copy(dx.x,dx.unsupported?'Kopiert. Achtung: enthält nicht belegte Aussagen':'Text für X kopiert');break;
+  case 'check-reply':replyFromClaim(v);break;
   case 'check-run':ui.ctext=$('#ctext').value;runCheck();break;
   case 'check-clear':ui.ctext='';ui.cpost='';ui.cres=null;render();break;
   case 'check-post':var cpp=Repo.get('posts',id);if(cpp){ui.ctext=cpp.text||'';ui.cpost=id;ui.cres=Analyse.analyzeClaims(ui.ctext);render()}break;
@@ -1050,7 +1112,7 @@ document.addEventListener('keydown',function(ev){
  if(ev.key==='Escape'&&!$('#overlay').hidden){closeSheet();return}
  if((ev.key==='Enter'||ev.key===' ')&&ev.target.getAttribute&&ev.target.getAttribute('role')==='button'){ev.preventDefault();ev.target.click()}});
 document.addEventListener('input',function(ev){var i=ev.target.id;
- if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}else if(i==='ctext'){ui.ctext=ev.target.value}});
+ if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}else if(i==='ctext'){ui.ctext=ev.target.value}else if(i==='rclaim'){ui.rclaim=ev.target.value;paintDraft()}else if(i==='rq'){ui.rq=ev.target.value;paintReplyAdd()}});
 document.addEventListener('change',function(ev){var i=ev.target.id,v=ev.target.value;
  if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}else if(i==='s-coi'){var cf=$('#s-conflicts-f');if(cf)cf.hidden=v!=='ja'}
  else if(i==='mig-file'&&ev.target.files[0]){var fl=ev.target.files[0],r=new FileReader();r.onload=function(){mig.text=String(r.result);mig.fileName=fl.name+' ('+Math.round(fl.size/1024)+' KB)';mig.error='';migRender()};r.onerror=function(){mig.error='Die Datei konnte nicht gelesen werden.';migRender()};r.readAsText(fl)}
