@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.0.0-etappe2';
+var APP_VERSION='3.0.0-etappe3';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -377,7 +377,8 @@ function updateSaved(){
  var el=$('#saved');if(!el||!Repo.db)return;var ts=Repo.db.meta&&Repo.db.meta.lastSaved;
  if(!Repo.ready){el.className='bad';el.textContent='Nicht dauerhaft gespeichert (nur Arbeitsspeicher)'}
  else if(!Repo.persistent){el.className='bad';el.textContent='Letzte Änderung nicht gespeichert'}
- else{el.className='';el.textContent=ts?'Automatisch gespeichert '+fmtSaved(ts):'Gespeichert auf diesem Gerät'}}
+ else{el.className='';el.textContent=ts?'Automatisch gespeichert '+fmtSaved(ts):'Gespeichert auf diesem Gerät'}
+ if(navigator.onLine===false)el.textContent+=' · Offline'}
 
 /* ================= X-Beiträge ================= */
 var XHOSTS=['x.com','www.x.com','twitter.com','www.twitter.com','mobile.twitter.com','mobile.x.com'];
@@ -573,12 +574,61 @@ function restoreBackup(id){
  var data=JSON.parse(JSON.stringify(bk.db)); /* Kopie, bevor die Sicherungsliste sich ändert */
  Repo.addBackup('Vor Wiederherstellung').then(function(){return Repo.replace(data)}).then(function(){render();toast('Sicherung wiederhergestellt')})}
 
+/* ================= Installation, Offline-Betrieb, Updates ================= */
+var pwa={reg:null,waiting:null,prompt:null,standalone:false,offline:'pruefe',applying:false,error:''};
+function isStandalone(){try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}}
+function setupPWA(){
+ pwa.standalone=isStandalone();
+ window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();pwa.prompt=e;refreshPwaUi()});
+ window.addEventListener('appinstalled',function(){pwa.prompt=null;toast('DebateBase wurde installiert');DB.requestPersist().then(function(p){Repo.persisted=p;refreshPwaUi()})});
+ window.addEventListener('online',updateSaved);window.addEventListener('offline',updateSaved);
+ if(!('serviceWorker' in navigator)){pwa.offline='nein';pwa.error='Dieser Browser unterstützt keine Service Worker.';return}
+ navigator.serviceWorker.register('./service-worker.js').then(function(reg){
+  pwa.reg=reg;
+  if(reg.waiting&&navigator.serviceWorker.controller){pwa.waiting=reg.waiting;showUpdate()}
+  reg.addEventListener('updatefound',function(){var nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',function(){
+   if(nw.state==='installed'){if(navigator.serviceWorker.controller){pwa.waiting=nw;showUpdate()}else{pwa.offline='ja';toast('DebateBase ist jetzt auch offline verfügbar');refreshPwaUi()}}
+   else if(nw.state==='redundant'&&!navigator.serviceWorker.controller){pwa.offline='nein';pwa.error='Die App-Dateien konnten nicht gespeichert werden.';refreshPwaUi()}})});
+  navigator.serviceWorker.ready.then(function(r){pwa.offline='ja';refreshPwaUi();if(r.active)r.active.postMessage('cacheFonts')});
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')reg.update().catch(function(){})});
+ }).catch(function(e){pwa.offline='nein';pwa.error=e&&e.message?e.message:String(e);refreshPwaUi()});
+ navigator.serviceWorker.addEventListener('controllerchange',function(){if(pwa.applying){pwa.applying=false;location.reload()}});
+}
+function refreshPwaUi(){
+ var a=document.activeElement,typing=a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+ if((ui.route==='einstellungen'||ui.route==='dashboard')&&$('#overlay').hidden&&!typing&&Repo.db)render()}
+function showUpdate(){var b=$('#update');if(b)b.hidden=false}
+function applyUpdate(){
+ if(!pwa.waiting){location.reload();return}
+ pwa.applying=true;var b=$('#update [data-act=apply-update]');if(b){b.disabled=true;b.textContent='Wird aktualisiert …'}
+ pwa.waiting.postMessage('skipWaiting')}
+function installApp(){
+ if(!pwa.prompt){toast('Bitte über das Chrome-Menü ⋮ → „App installieren“');return}
+ var p=pwa.prompt;pwa.prompt=null;p.prompt();
+ p.userChoice.then(function(c){if(c&&c.outcome!=='accepted')toast('Installation abgebrochen. Du kannst es später erneut versuchen.');refreshPwaUi()},function(){refreshPwaUi()})}
+function installCard(){
+ if(pwa.standalone||!pwa.prompt||Repo.db.meta.installHintHidden)return '';
+ return '<div class="card welcome"><h3>Als App installieren</h3><p>Dann startet DebateBase vom Startbildschirm, ohne Browserleiste und auch ohne Internet.</p><div class="btns" style="margin-top:12px"><button class="btn primary" data-act="install">Installieren</button><button class="btn" data-act="hide-install">Später</button></div></div>'}
+function viewApp(){
+ var st=pwa.standalone?'Als App installiert':'Im Browser geöffnet';
+ var off=pwa.offline==='ja'?'Bereit: startet auch ohne Internet':pwa.offline==='nein'?'Nicht verfügbar'+(pwa.error?' ('+esc(pwa.error)+')':''):'Wird vorbereitet …';
+ var h='<section class="sec" id="sec-app"><h2>App</h2><div class="card"><dl><dt>Status</dt><dd>'+st+'</dd><dt>Offline</dt><dd>'+off+'</dd><dt>Internet</dt><dd>'+(navigator.onLine===false?'Keine Verbindung':'Verbunden')+'</dd><dt>Version</dt><dd>'+esc(APP_VERSION)+'</dd></dl></div>';
+ if(!pwa.standalone){
+  h+=pwa.prompt?'<button class="btn primary block" data-act="install">DebateBase als App installieren</button>':
+  '<div class="card"><p style="color:var(--fg);margin:0 0 6px"><b>So installierst du DebateBase:</b></p><ol class="steps"><li>In Chrome oben rechts auf <b>⋮</b> tippen.</li><li><b>App installieren</b> oder <b>Zum Startbildschirm hinzufügen</b> wählen.</li><li><b>Installieren</b> bestätigen. Das Symbol erscheint auf dem Startbildschirm.</li></ol><p class="note" style="margin-top:8px">Deine Daten bleiben dabei erhalten: Browser und App nutzen dieselbe Datenbank auf diesem Gerät.</p></div>'}
+ h+='<button class="btn block" data-act="check-update">Nach Updates suchen</button></section>';
+ return h}
+function checkUpdate(){
+ if(!pwa.reg){toast('Updates sind erst nach dem Laden der App-Dateien möglich.');return}
+ if(navigator.onLine===false){toast('Keine Internetverbindung. Bitte später erneut versuchen.');return}
+ pwa.reg.update().then(function(){setTimeout(function(){if(pwa.waiting)showUpdate();else toast('DebateBase ist auf dem neuesten Stand ('+APP_VERSION+')')},1500)},function(){toast('Update-Prüfung fehlgeschlagen',true)})}
+
 /* ================= Einstellungen ================= */
 function bkCounts(c){c=c||{};return (c.entries||0)+' Einträge, '+(c.sources||0)+' Quellen, '+(c.args||0)+' Karten, '+(c.links||0)+' Verknüpfungen, '+(c.posts||0)+' X-Beiträge'}
 function viewSettings(){
  var th=Repo.db.settings.theme,D=Repo.db,ts=D.meta&&D.meta.lastSaved,iss=checkIntegrity();
  var prot=Repo.persisted===true?'Aktiv':Repo.persisted===false?'Nicht gewährt (Chrome entscheidet selbst; nach der Installation meist aktiv)':'Unbekannt';
- return '<section class="sec"><h2>Darstellung</h2><div class="seg">'+[['system','System'],['hell','Hell'],['dunkel','Dunkel']].map(function(p){return '<button data-act="set-theme" data-v="'+p[0]+'" aria-pressed="'+(th===p[0])+'">'+p[1]+'</button>'}).join('')+'</div></section>'+
+ return '<section class="sec"><h2>Darstellung</h2><div class="seg">'+[['system','System'],['hell','Hell'],['dunkel','Dunkel']].map(function(p){return '<button data-act="set-theme" data-v="'+p[0]+'" aria-pressed="'+(th===p[0])+'">'+p[1]+'</button>'}).join('')+'</div></section>'+viewApp()+
  '<section class="sec"><h2>Datensicherheit</h2><div class="card"><dl><dt>Einträge</dt><dd>'+D.entries.length+'</dd><dt>Quellen</dt><dd>'+D.sources.length+'</dd><dt>Karten</dt><dd>'+D.args.length+'</dd><dt>Verknüpfungen</dt><dd>'+D.links.length+'</dd><dt>X-Beiträge</dt><dd>'+D.posts.length+'</dd>'+
  '<dt>Speicher</dt><dd>'+(Repo.ready?'IndexedDB auf diesem Gerät':'Nur Arbeitsspeicher, geht beim Schließen verloren')+'</dd>'+
  '<dt>Schutz vor Löschen</dt><dd>'+prot+'</dd><dt>Belegt</dt><dd id="usage">…</dd><dt>Datenbank</dt><dd>Version '+DB.VERSION+'</dd>'+
@@ -595,7 +645,7 @@ function viewSettings(){
  '<section class="sec"><h2>X-Beiträge</h2><button class="btn block" data-act="new-post">'+ic('link',18)+'X-Beitrag erfassen</button>'+
  '<div class="card"><div class="meta"><b style="font-family:var(--f-display)">Android-Teilen</b><span class="chip st st-pruefung">Folgt in Etappe 4</span></div><p style="margin-top:8px">Teilen aus der X-App direkt nach DebateBase wird angebunden, sobald die App installierbar ist (Manifest und Service Worker). Bis dahin X-Beiträge bitte über „X-Beitrag erfassen“ einfügen.</p></div></section>'+
  '<section class="sec"><h2>Zurücksetzen</h2><button class="btn block" data-act="reset-sample">Beispieldaten wiederherstellen</button><button class="btn block danger" data-act="wipe">Alle Daten löschen</button></section>'+
- '<p class="note">DebateBase '+esc(APP_VERSION)+'. Installation, Offline-Betrieb und Teilen folgen in den nächsten Etappen. Beispieldaten dienen nur zur Demonstration, bitte Fakten vor der Verwendung selbst prüfen.</p>'}
+ '<p class="note">DebateBase '+esc(APP_VERSION)+'. Teilen aus der X-App folgt in Etappe 4. Beispieldaten dienen nur zur Demonstration, bitte Fakten vor der Verwendung selbst prüfen.</p>'}
 function migLog(){var L=(Repo.db.meta.migrations||[]).slice(-3).reverse();if(!L.length)return '';
  return '<div class="card"><p style="color:var(--fg);margin:0 0 4px"><b>Letzte Importe</b></p><ul class="issues">'+L.map(function(m){return '<li>'+fmtSaved(m.at)+': '+esc(m.format)+', '+(m.mode==='replace'?'ersetzt':'zusammengeführt')+', '+m.written+' Datensätze, Nachkontrolle '+m.verified+'/'+m.written+(m.problems?' – '+m.problems+' Probleme':' ✓')+'</li>'}).join('')+'</ul></div>'}
 function paintUsage(){var el=$('#usage');if(!el)return;DB.estimate().then(function(e){if(!el.isConnected)return;el.textContent=e&&e.usage!=null?(e.usage/1048576).toFixed(2).replace('.',',')+' MB':'Unbekannt'})}
@@ -640,7 +690,7 @@ function viewDashboard(){
  var recent=[].concat(E.map(function(o){return {k:'Wissen',a:'open-entry',o:o,t:o.created}}),S.map(function(o){return {k:'Quelle',a:'open-source',o:o,t:o.created}}),A.map(function(o){return {k:'Argument',a:'open-arg',o:o,t:o.created}})).sort(function(a,b){return b.t-a.t}).slice(0,6);
  var cnt={};E.forEach(function(e){cnt[e.status]=(cnt[e.status]||0)+1});
  var keys=Object.keys(STATUS).filter(function(k){return cnt[k]});
- return welcomeCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
+ return welcomeCard()+installCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
  '<section class="sec"><h2>Neu anlegen</h2><div class="actions"><button class="btn primary" data-act="new-entry">'+ic('plus',18)+'Neuer Eintrag</button><button class="btn" data-act="new-source">'+ic('plus',18)+'Neue Quelle</button><button class="btn" data-act="new-arg">'+ic('plus',18)+'Neue Karte</button><button class="btn" data-act="new-research">'+ic('search',18)+'Neue Recherche</button><button class="btn block" style="grid-column:1/-1" data-act="new-post">'+ic('link',18)+'X-Beitrag erfassen</button></div></section>'+
  '<section class="sec"><div class="sec-h"><h2>Offene Recherchen ('+open.length+')</h2></div>'+(open.length?open.map(function(e){return '<button class="row" data-act="open-entry" data-id="'+esc(e.id)+'"><div><b>'+esc(e.title)+'</b><small>'+esc(TYPES[e.type]||e.type)+(e.topic?' · '+esc(e.topic):'')+'</small></div>'+stChip(e.status)+'</button>'}).join(''):empty('Keine offenen Recherchen. Offene Fragen und Einträge „In Prüfung“ erscheinen hier.'))+'</section>'+
  (recent.length?'<section class="sec"><h2>Zuletzt hinzugefügt</h2>'+recent.map(function(r){return '<button class="row" data-act="'+r.a+'" data-id="'+esc(r.o.id)+'"><span class="kind">'+r.k+'</span><div><b>'+esc(r.o.title)+'</b><small>'+rel(r.t)+'</small></div></button>'}).join('')+'</section>':'')+
@@ -749,6 +799,10 @@ document.addEventListener('click',function(ev){
   case 'mig-apply':migApply();break;
   case 'mig-copy-report':copy(migReport(),'Bericht kopiert');break;
   case 'download':downloadExport();break;
+  case 'install':installApp();break;
+  case 'hide-install':Repo.setMeta('installHintHidden',Date.now()).then(render);break;
+  case 'apply-update':applyUpdate();break;
+  case 'check-update':checkUpdate();break;
   case 'reset-sample':dangerSheet('reset');break;
   case 'wipe':dangerSheet('wipe');break;
   case 'do-danger':doDanger(v);break;
@@ -785,6 +839,7 @@ if(window.matchMedia)try{matchMedia('(prefers-color-scheme: dark)').addEventList
 /* ---------- Start ---------- */
 DB.onBlocked=function(){toast('Bitte andere geöffnete DebateBase-Tabs schließen.',true)};
 DB.onVersionChange=function(){Repo.ready=false;updateSaved();toast('Eine neue Version ist aktiv. Bitte die App neu laden.',true)};
+setupPWA();
 Repo.load().then(function(){
  updateSaved();route();
  var iss=Repo.ready?checkIntegrity():[];
@@ -792,5 +847,5 @@ Repo.load().then(function(){
  return DB.requestPersist().then(function(p){Repo.persisted=p;if(ui.route==='einstellungen')render()});
 });
 /* Für automatische Tests */
-window.DebateBase={Repo:Repo,checkIntegrity:checkIntegrity,buildExport:buildExport,version:APP_VERSION};
+window.DebateBase={Repo:Repo,checkIntegrity:checkIntegrity,buildExport:buildExport,version:APP_VERSION,pwa:pwa};
 })();

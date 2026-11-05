@@ -11,17 +11,25 @@ try { ({ chromium } = require('playwright')); }
 catch { ({ chromium } = require('/opt/npm-tools/node_modules/playwright')); }
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
+export const PREFIX = '/DebateBase/';
+/* Für Tests: einzelne Dateien durch anderen Inhalt ersetzen (z. B. neue Version) */
+export const OVERRIDES = {};
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  /* Wie bei GitHub Pages liegt die App in einem Unterordner */
+  if (!p.startsWith(PREFIX)) { res.writeHead(404); res.end('nicht gefunden'); return; }
+  p = p.slice(PREFIX.length - 1);
   if (p.endsWith('/')) p += 'index.html';
+  const over = OVERRIDES[p];
+  if (over != null) { res.writeHead(200, { 'Content-Type': TYPES[path.extname(p)] || 'text/plain' }); res.end(over); return; }
   const f = path.join(ROOT, p);
   if (!f.startsWith(ROOT) || !fs.existsSync(f)) { res.writeHead(404); res.end('nicht gefunden'); return; }
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' });
   fs.createReadStream(f).pipe(res);
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
-export const BASE = `http://127.0.0.1:${server.address().port}/`;
+export const BASE = `http://127.0.0.1:${server.address().port}${PREFIX}`;
 
 export const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const results = [];
