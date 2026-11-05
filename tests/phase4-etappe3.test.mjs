@@ -44,7 +44,8 @@ await test('Analyse: Aussagen getrennt, Einordnung mit „unsicher“, passende 
   assert(c3.includes('Sanktionen wirken nie') && c3.includes('Argumentationskarte') && c3.includes('Vage Angabe') && c3.includes('Gibt es Gegenbeispiele?'), c3);
   assert((await cards.nth(3).textContent()).includes('Eher Meinung oder Wertung'), 'Meinung');
   assert((await cards.nth(4).textContent()).includes('Frage'), 'Frage');
-  assert(c1.includes('wird hier nicht beurteilt'), 'kein Urteil über Stützen/Widersprechen');
+  /* Ab Etappe 4 ersetzt die Zusammenhangsanalyse den Hinweis „wird hier nicht beurteilt“; sie kennzeichnet ihre Ergebnisse als Hinweise */
+  assert(c1.includes('Hinweise, keine Urteile'), 'Ergebnisse als Hinweise gekennzeichnet');
   await cards.nth(0).locator('[data-act=open-item]').click();
   assert((await page.textContent('#sheet h2.t')).includes('Die EU hat 28 Mitgliedstaaten'), 'Eintrag öffnet');
   assert(page.errors.length === 0, page.errors.join('; '));

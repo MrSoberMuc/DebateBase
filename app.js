@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.3.0';
+var APP_VERSION='3.4.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -886,29 +886,44 @@ function viewCheck(){
  '<div class="btns"><button class="btn" data-act="check-clear">Leeren</button><button class="btn primary" data-act="check-run">Analysieren</button></div>'+
  (P.length?'<details class="card"><summary><b>Gespeicherten X-Beitrag wählen ('+P.length+')</b></summary><div class="stack" style="margin-top:8px">'+P.slice(0,20).map(function(p){return '<button class="row" data-act="check-post" data-id="'+esc(p.id)+'"><div><b>'+esc(postTitle(p))+'</b><small>'+(p.handle?'@'+esc(p.handle)+' · ':'')+rel(p.created)+'</small></div></button>'}).join('')+'</div></details>':'')+
  '<div id="cres" class="stack"></div>'}
-function claimDocs(){return Repo.all('entries').map(function(o){return docFor('entries',o)}).concat(Repo.all('args').map(function(o){return docFor('args',o)}))}
+
 function paintCheck(){
  var el=$('#cres');if(!el)return;var r=ui.cres;
  if(!r){el.innerHTML=empty('Füge einen Text ein und tippe auf „Analysieren“. Das Ergebnis wird nicht gespeichert.');return}
  if(!r.statements.length){el.innerHTML=empty('Im Text wurde keine Aussage erkannt.');return}
- var docs=claimDocs(),idx=synIdx(),S=r.statements,sum=r.summary;
+ var idx=synIdx(),S=r.statements,sum=r.summary,D=Repo.db;
+ var relOpts={synIndex:idx,ltypes:LTYPES,statusLabel:function(s){return STATUS[s]||s},typeLabel:function(t){return TYPES[t]||t}};
+ var REL=S.map(function(st){return st.kind==='fragment'?null:Analyse.relate(st.text,D,relOpts)});
+ var nContra=REL.filter(function(x){return x&&x.groups.widersprechend.length}).length;
  var order=['pruefbar','gemischt','meinung','frage','aussage','fragment'];
- var h='<div class="card" id="csum"><h3 style="margin:0 0 6px">'+S.length+(S.length===1?' Aussage erkannt':' Aussagen erkannt')+'</h3><div class="chips" style="flex-wrap:wrap">'+order.filter(function(k){return sum[k]}).map(function(k){return '<span class="chip ck-'+k+'">'+esc(Analyse.CLAIM_KINDS[k])+': '+sum[k]+'</span>'}).join('')+'</div>'+
+ var h='<div class="card" id="csum"><h3 style="margin:0 0 6px">'+S.length+(S.length===1?' Aussage erkannt':' Aussagen erkannt')+'</h3><div class="chips" style="flex-wrap:wrap">'+order.filter(function(k){return sum[k]}).map(function(k){return '<span class="chip ck-'+k+'">'+esc(Analyse.CLAIM_KINDS[k])+': '+sum[k]+'</span>'}).join('')+(nContra?'<span class="chip rel-chip rel-widersprechend">Mit Widerspruchskandidaten: '+nContra+'</span>':'')+'</div>'+
   ((r.links.length||r.mentions.length||r.hashtags.length)?'<p class="note" style="margin-top:8px">'+[r.links.length?r.links.length+(r.links.length===1?' Link':' Links')+' entfernt':'',r.mentions.length?'Erwähnt: '+r.mentions.map(function(m){return '@'+esc(m)}).join(', '):'',r.hashtags.length?'Hashtags: '+r.hashtags.map(esc).join(', '):''].filter(Boolean).join(' · ')+'</p>':'')+'</div>';
- h+=S.slice(0,CLAIM_SHOW).map(function(st){
-  var M=st.kind==='fragment'?[]:Analyse.matchText(docs,st.text,{synIndex:idx,max:3});
-  var Q=Analyse.openQuestions(st,M.map(function(m){return {status:m.doc.item.status}}),function(s){return STATUS[s]||s});
+ h+=S.slice(0,CLAIM_SHOW).map(function(st,i){
+  var R=REL[i],found=R?Analyse.REL_ORDER.reduce(function(a,k){return a.concat(R.groups[k])},[]):[];
+  var Q=Analyse.openQuestions(st,found.map(function(x){return {status:x.status}}),function(s){return STATUS[s]||s});
+  if(R&&R.groups.widersprechend.length)Q.unshift('Widerspruchskandidat gefunden: Im verknüpften Eintrag nachprüfen, ob wirklich ein Widerspruch besteht.');
   var feats=st.rules;
   return '<article class="card claim ck-'+st.kind+'" data-n="'+st.n+'"><div class="meta"><span class="chip">Aussage '+st.n+'</span><span class="chip ck-'+st.kind+'">'+esc(st.kindLabel)+'</span><span class="chip tag" title="Nach festen Regeln erkannt">unsicher</span></div>'+
   '<p class="body claim-text">'+esc(st.text)+'</p>'+
   '<p class="note">Einordnung nach Regeln: '+esc(st.why)+'.</p>'+
   (feats.length?'<ul class="feats">'+feats.map(function(f){return '<li><b>'+esc(f.label)+'</b> („'+esc(f.words.join('“, „'))+'“): '+esc(f.hint)+'</li>'}).join('')+'</ul>':'')+
-  (st.kind==='fragment'?'':'<div class="sec"><h2>Passende Einträge ('+M.length+')</h2>'+(M.length?M.map(function(m){var o=m.doc.item;
-   return '<button class="row" data-act="open-item" data-k="'+m.doc.kind+'" data-id="'+esc(o.id)+'"><div><b>'+esc(o.title)+'</b><small>'+(m.doc.kind==='args'?'Argumentationskarte':esc(TYPES[o.type]||o.type))+' · '+m.matched.length+' von '+m.total+' Stichwörtern: '+esc(m.matched.join(', '))+'</small></div>'+stChip(o.status)+'</button>'}).join('')+'<p class="note">Gefunden über gemeinsame Wörter. Ob ein Eintrag die Aussage stützt oder ihr widerspricht, wird hier nicht beurteilt.</p>':'<p class="note">Kein gespeicherter Eintrag passt.</p>')+'</div>')+
+  (R?relSection(R):'')+
   (Q.length?'<div class="sec"><h2>Offene Fragen</h2><ul class="openq">'+Q.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>':'')+
   '<div class="btns" style="margin-top:10px"><button class="btn" data-act="check-copy" data-v="'+st.n+'">'+ic('copy',18)+'Kopieren</button><button class="btn" data-act="check-save" data-v="'+st.n+'">'+ic('plus',18)+'Als Eintrag speichern</button></div></article>'}).join('');
  if(S.length>CLAIM_SHOW)h+='<p class="note">'+(S.length-CLAIM_SHOW)+' weitere Aussagen nicht angezeigt. Bitte den Text kürzen.</p>';
  el.innerHTML=h}
+/* Zusammenhänge einer Aussage (Etappe 4): jede Zeile nennt ihre Grundlage */
+var REL_HEAD={widersprechend:'Widersprechende Inhalte (Kandidaten)',unterstuetzend:'Unterstützende Inhalte',relativierend:'Relativierende Inhalte',ergaenzend:'Ergänzende Inhalte',thematisch:'Nur thematisch verwandt'};
+function relSection(R){
+ var n=Analyse.REL_ORDER.reduce(function(a,k){return a+R.groups[k].length},0);
+ if(!n&&!R.sources.length)return '<div class="sec rel"><h2>Zusammenhänge</h2><p class="note">Kein gespeicherter Eintrag und keine Argumentationskarte passt.</p></div>';
+ var row=function(x){var o=Repo.get(x.kind,x.id);if(!o)return '';
+  return '<button class="row relrow" data-act="open-item" data-k="'+x.kind+'" data-id="'+esc(x.id)+'"><div><b>'+esc(o.title)+'</b><small>'+(x.kind==='args'?'Argumentationskarte · Status gilt für ihr Gegenargument':esc(TYPES[o.type]||o.type))+'</small><span class="basis">Grundlage: '+esc(x.basis.join(' · '))+'</span></div>'+stChip(o.status)+'</button>'};
+ return '<div class="sec rel"><h2>Zusammenhänge</h2>'+Analyse.REL_ORDER.filter(function(k){return R.groups[k].length}).map(function(k){
+  return '<div class="relgrp rel-'+k+'"><h3>'+REL_HEAD[k]+' ('+R.groups[k].length+')</h3>'+R.groups[k].map(row).join('')+'</div>'}).join('')+
+ (R.sources.length?'<div class="relgrp rel-quellen"><h3>Verwandte Quellen ('+R.sources.length+')</h3>'+R.sources.map(function(q){var s=Repo.get('sources',q.id);if(!s)return '';
+  return '<button class="row relrow" data-act="open-source" data-id="'+esc(q.id)+'"><div><b>'+esc(s.title)+'</b><small>'+esc(s.kind||'')+'</small><span class="basis">Grundlage: '+esc(q.basis.join(' · '))+'</span></div>'+docChip(s)+'</button>'}).join('')+'</div>':'')+
+ '<p class="note">Ermittelt nach festen Regeln aus Prüfstatus, Verknüpfungen, Argumentationskarten, abweichenden Zahlen und Verneinungen. „Widersprechend“ und „unterstützend“ sind Hinweise, keine Urteile: bitte im Eintrag nachprüfen.</p></div>'}
 function runCheck(){var t=String(ui.ctext||'').trim();if(!t){toast('Bitte zuerst einen Text einfügen');return}ui.cres=Analyse.analyzeClaims(t);paintCheck();var c=$('#csum');if(c&&c.scrollIntoView)c.scrollIntoView({block:'start'})}
 function claimOf(n){return ui.cres&&ui.cres.statements.filter(function(s){return s.n===+n})[0]}
 function saveClaim(n){

@@ -534,7 +534,7 @@
      inhaltliche Wörter; Treffer brauchen mindestens zwei davon oder einen
      starken Treffer in Titel/Tags. Keine Tippfehler-Toleranz (zu ungenau). */
   var RULE_WORDS = {};
-  ('immer nie niemals alle allen jeder jede jedes jeden niemand keiner kein keine keinen keinem keines nicht nichts nur noch sehr viele einige manche mehr weniger gibt gab hat haben hatte hatten kann koennen konnte muss muessen sollte sollten wurde wurden worden weil deshalb daher darum wegen laut sagt sagte heute jahr jahre jahren prozent seit also eigentlich wirklich einfach schon wieder ganz etwa rund ueber unter mal ja nein doch eben wohl gar sogar bereits damit dabei dazu denn sondern bzw beim sagen sagt sagte sagten gesagt zeigt zeigen zeigte gezeigt behaupten weiss wissen macht machen gemacht geht gehen kommt kommen sind war waren ist gilt meint meinen finde finden denke glaube').split(' ').forEach(function (w) { RULE_WORDS[w] = 1; });
+  ('zwischen seit durch ohne gegen immer nie niemals alle allen jeder jede jedes jeden niemand keiner kein keine keinen keinem keines nicht nichts nur noch sehr viele einige manche mehr weniger gibt gab hat haben hatte hatten kann koennen konnte muss muessen sollte sollten wurde wurden worden weil deshalb daher darum wegen laut sagt sagte heute jahr jahre jahren prozent seit also eigentlich wirklich einfach schon wieder ganz etwa rund ueber unter mal ja nein doch eben wohl gar sogar bereits damit dabei dazu denn sondern bzw beim sagen sagt sagte sagten gesagt zeigt zeigen zeigte gezeigt behaupten weiss wissen macht machen gemacht geht gehen kommt kommen sind war waren ist gilt meint meinen finde finden denke glaube').split(' ').forEach(function (w) { RULE_WORDS[w] = 1; });
   function matchText(docs, text, opts) {
     opts = opts || {};
     var idx = opts.synIndex || synIndex(opts.synonyms || SYNONYMS);
@@ -568,6 +568,162 @@
     return out.slice(0, opts.max || 3);
   }
 
+  /* =====================================================================
+   * Zusammenhangs- und Widerspruchsanalyse (Phase 4, Etappe 4)
+   * Vergleicht eine Aussage mit gespeicherten Einträgen, Argumentationskarten,
+   * Verknüpfungen und Quellen. Grundlage sind ausschließlich:
+   *   - gemeinsame Stichwörter (wie „gleichartig“ ist die Aussage?),
+   *   - der Prüfstatus des gespeicherten Eintrags,
+   *   - vorhandene Verknüpfungen (Widerspricht, Unterstützt, …),
+   *   - abweichende Zahlen und eine Verneinung nur auf einer Seite,
+   *   - Behauptung/Gegenargument einer Argumentationskarte.
+   * Jedes Ergebnis nennt die gespeicherten Einträge, auf denen es beruht.
+   * Ein „Widerspruch“ ist immer ein Kandidat, kein Urteil.
+   * ===================================================================== */
+  var NEG = /(?<![\p{L}])(nicht|kein|keine|keinen|keinem|keiner|keines|nie|niemals|nichts)(?![\p{L}])/iu;
+  function numbers(text) {
+    var out = [], m, re = /(?<![\p{L}\d])(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?(?![\d])/gu;
+    while ((m = re.exec(String(text || '')))) out.push(parseFloat(m[1].replace(/\./g, '') + (m[2] ? '.' + m[2] : '')));
+    return out;
+  }
+  var REL_ORDER = ['widersprechend', 'unterstuetzend', 'relativierend', 'ergaenzend', 'thematisch'];
+  var REL_LABEL = { widersprechend: 'Widersprechende Inhalte', unterstuetzend: 'Unterstützende Inhalte', relativierend: 'Relativierende Inhalte', ergaenzend: 'Ergänzende Inhalte', thematisch: 'Nur thematisch verwandt' };
+  var FACT_TYPES = { fakt: 1, statistik: 1, studie: 1, definition: 1 };
+  var REL_SHORT = { widersprechend: 'widersprechender Inhalt', unterstuetzend: 'unterstützender Inhalt', relativierend: 'relativierender Inhalt', ergaenzend: 'ergänzender Inhalt' };
+  var OPP = { widersprechend: 'unterstuetzend', unterstuetzend: 'widersprechend' };
+
+  /* data = { entries, args, links, sources } wie gespeichert
+     opts = { synIndex, statusLabel(s), ltypes } */
+  function relate(text, data, opts) {
+    opts = opts || {};
+    var idx = opts.synIndex || synIndex(SYNONYMS), SL = opts.statusLabel || function (s) { return s; };
+    var f = function (label, weight, t) { return { label: label, weight: weight, text: t == null ? '' : String(t) }; };
+    var title = function (k, id) { var L = data[k] || [], o = null; for (var i = 0; i < L.length; i++) if (L[i].id === id) { o = L[i]; break; } return o; };
+    /* Kerntexte: die eigentliche Aussage eines Eintrags bzw. die zwei Seiten einer Karte */
+    var core = [];
+    (data.entries || []).forEach(function (e) { core.push({ id: e.id, kind: 'entries', side: 'eintrag', item: e, fields: [f('Titel', 5, e.title), f('Kernaussage', 4, e.claimCore)] }); });
+    (data.args || []).forEach(function (a) {
+      core.push({ id: a.id, kind: 'args', side: 'behauptung', item: a, fields: [f('Titel', 5, a.title), f('Behauptung der Gegenseite', 4, a.claim)] });
+      core.push({ id: a.id, kind: 'args', side: 'gegenargument', item: a, fields: [f('Gegenargument', 4, a.counter)] });
+    });
+    var full = [];
+    (data.entries || []).forEach(function (e) { full.push({ id: e.id, kind: 'entries', item: e, fields: [f('Titel', 5, e.title), f('Tags', 4, (e.tags || []).join(', ')), f('Kernaussage', 3, e.claimCore), f('Beschreibung', 2, e.description), f('Evidenz', 1, e.evidence), f('Einschränkungen', 1, e.limits)] }); });
+    (data.args || []).forEach(function (a) { full.push({ id: a.id, kind: 'args', item: a, fields: [f('Titel', 5, a.title), f('Behauptung', 3, a.claim), f('Gegenargument', 2, a.counter)] }); });
+
+    var stNeg = NEG.test(text), stNum = numbers(text);
+    var res = {}, key = function (k, id) { return k + ':' + id; };
+    function add(k, item, rel, basis, how) {
+      var kk = key(k, item.id), cur = res[kk];
+      if (!cur) cur = res[kk] = { kind: k, id: item.id, title: item.title, status: item.status, rel: rel, basis: [], how: how };
+      /* Ein direkter Vergleich (Status, Karte, Fakt) wird nicht durch eine Verknüpfung überstimmt */
+      else if (!(how === 'link' && cur.how !== 'link' && cur.how !== 'woerter') && REL_ORDER.indexOf(rel) < REL_ORDER.indexOf(cur.rel)) { cur.rel = rel; cur.how = how; }
+      if (cur.basis.indexOf(basis) < 0) cur.basis.push(basis);
+    }
+
+    /* 1. Gleichartige Aussagen finden (Kerntext, mindestens 60 % der Stichwörter) */
+    var anchors = [];
+    matchText(core, text, { synIndex: idx, max: 8 }).forEach(function (m) {
+      var cov = m.matched.length / m.total;
+      if (!(m.matched.length >= 2 && cov >= 0.6) && !(m.total <= 2 && m.matched.length === m.total)) return;
+      var d = m.doc, o = d.item, coreText = d.fields.map(function (x) { return x.text; }).join(' ');
+      /* Verneinung nur bei kurzen Kerntexten auswerten; in langen Texten ist „nicht“ zu häufig */
+      var flip = words(coreText).length <= 25 && stNeg !== NEG.test(coreText);
+      var cn = numbers(d.fields.length ? d.fields[0].text + ' ' + (d.fields[1] ? d.fields[1].text : '') : '');
+      var numDiff = stNum.length && cn.length && !stNum.some(function (n) { return cn.indexOf(n) >= 0; });
+      var same = 'Stichwörter: ' + m.matched.join(', ');
+      var tags = [];
+      if (flip) tags.push('Verneinung nur auf einer Seite');
+      if (numDiff) tags.push('Zahl weicht ab (' + stNum.join(', ') + ' ↔ ' + cn.join(', ') + ')');
+      var note = tags.length ? ' · ' + tags.join(' · ') : '';
+      var rel = null, how = '';
+      if (d.kind === 'args') {
+        /* Karte: Aussage gleicht der Behauptung der Gegenseite → das Gegenargument widerspricht ihr */
+        rel = d.side === 'behauptung' ? 'widersprechend' : 'unterstuetzend';
+        if (flip) rel = OPP[rel];
+        how = d.side === 'behauptung'
+          ? (flip ? 'verneint die „Behauptung der Gegenseite“ dieser Karte und liegt damit eher auf der Linie ihres Gegenarguments'
+                  : 'gleicht der „Behauptung der Gegenseite“ dieser Karte; ihr Gegenargument widerspricht')
+          : (flip ? 'verneint das Gegenargument dieser Karte' : 'gleicht dem Gegenargument dieser Karte');
+        how += ' (' + same + note + ')';
+      } else {
+        var st = o.status;
+        if (st === 'belegt' || st === 'teilweise') { rel = 'unterstuetzend'; how = 'gleichartiger Eintrag, Prüfstatus „' + SL(st) + '“'; }
+        else if (st === 'widerlegt' || st === 'veraltet') { rel = 'widersprechend'; how = 'gleichartiger Eintrag ist als „' + SL(st) + '“ markiert'; }
+        else if (st === 'umstritten') { rel = 'relativierend'; how = 'gleichartiger Eintrag ist als „Umstritten“ markiert'; }
+        else { rel = 'thematisch'; how = 'gleichartiger Eintrag, aber noch nicht geprüft („' + SL(st) + '“)'; }
+        if (flip && OPP[rel]) rel = OPP[rel];
+        /* abweichende Zahl: belegter Eintrag → Widerspruch; widerlegter/veralteter → eher Bestätigung der neuen Zahl */
+        if (numDiff && !flip && OPP[rel]) rel = OPP[rel];
+        how += ' (' + same + note + ')';
+      }
+      add(d.kind, o, rel, how, d.kind === 'args' ? 'karte' : 'status');
+      /* orient: +1 = Aussage sagt dasselbe wie die „Position“ des Ankers, -1 = das Gegenteil.
+         Bei Karten ist die Position das Gegenargument (Verknüpfungen beziehen sich darauf). */
+      var orient = d.kind === 'args' ? ((d.side === 'behauptung') !== flip ? -1 : 1) : ((flip || numDiff) ? -1 : 1);
+      anchors.push({ kind: d.kind, item: o, rel: rel, orient: orient });
+    });
+
+    /* 2. Vorhandene Verknüpfungen der gleichartigen Einträge nutzen */
+    var LT = opts.ltypes || {};
+    anchors.forEach(function (a) {
+      var base = a.orient;
+      (data.links || []).forEach(function (l) {
+        var from = l.fromK === a.kind && l.fromId === a.item.id, to = l.toK === a.kind && l.toId === a.item.id;
+        if (!from && !to) return;
+        var pk = from ? l.toK : l.fromK, pid = from ? l.toId : l.fromId, p = title(pk, pid);
+        if (!p) return;
+        var verb = (LT[l.type] || [l.type, l.type])[0];
+        var nm = function (k, o) { return (k === 'args' ? 'die Karte „' : '„') + o.title + '“'; };
+        var desc = from ? nm(a.kind, a.item) + ' ' + verb.toLowerCase() + ' ' + nm(pk, p) : nm(pk, p) + ' ' + verb.toLowerCase() + ' ' + nm(a.kind, a.item);
+        if (a.kind === 'args') desc += ' (bezieht sich auf das Gegenargument der Karte)';
+        var rel = 'ergaenzend';
+        if (l.type === 'widerspricht') rel = base > 0 ? 'widersprechend' : 'unterstuetzend';
+        else if (l.type === 'unterstuetzt' && to) rel = base > 0 ? 'unterstuetzend' : 'widersprechend';
+        else if (l.type === 'relativiert' && to) rel = 'relativierend';
+        add(pk, p, rel, 'über Verknüpfung: ' + desc, 'link');
+      });
+    });
+
+    /* 3. Nur thematisch verwandt: gemeinsame Wörter, aber keine gleichartige Aussage */
+    matchText(full, text, { synIndex: idx, max: 6 }).forEach(function (m) {
+      if (res[key(m.doc.kind, m.doc.id)]) return;
+      var o = m.doc.item, cov = m.matched.length / m.total;
+      /* Sonderfall: Aussage steht nahezu in der Beschreibung eines belegten Fakts */
+      if (m.doc.kind === 'entries' && FACT_TYPES[o.type] && (o.status === 'belegt' || o.status === 'teilweise') && m.matched.length >= 2 && cov >= 0.6) {
+        var dn = numbers(o.title + ' ' + (o.claimCore || '') + ' ' + (o.description || ''));
+        var diff = stNum.length && dn.length && !stNum.some(function (n) { return dn.indexOf(n) >= 0; });
+        add('entries', o, diff ? 'widersprechend' : 'unterstuetzend', (diff ? 'Zahl weicht ab (' + stNum.join(', ') + ' ↔ ' + dn.join(', ') + ') von einem' : 'Stichwörter stehen in einem') + ' belegten Eintrag vom Typ „' + (opts.typeLabel ? opts.typeLabel(o.type) : o.type) + '“ (' + m.matched.join(', ') + ')', 'fakt');
+        return;
+      }
+      add(m.doc.kind, m.doc.item, 'thematisch', 'gemeinsame Wörter: ' + m.matched.join(', ') + ' – kein Widerspruch oder Beleg erkennbar', 'woerter');
+    });
+
+    /* 4. Verwandte Quellen: Quellen der gefundenen Einträge und Quellen mit passenden Kernaussagen */
+    var srcOut = {}, srcById = {};
+    (data.sources || []).forEach(function (s) { srcById[s.id] = s; });
+    Object.keys(res).forEach(function (k) {
+      var r = res[k], o = title(r.kind, r.id);
+      if (!o || r.rel === 'thematisch') return;
+      (o.sourceIds || []).forEach(function (sid) {
+        var s = srcById[sid]; if (!s) return;
+        var x = srcOut[sid] = srcOut[sid] || { id: sid, title: s.title, basis: [] };
+        var b = 'genannt in „' + o.title + '“ (' + REL_SHORT[r.rel] + ')';
+        if (x.basis.indexOf(b) < 0) x.basis.push(b);
+      });
+    });
+    var sdocs = (data.sources || []).map(function (s) { return { id: s.id, kind: 'sources', item: s, fields: [f('Titel', 5, s.title), f('Kernaussagen', 3, s.keyClaims)] }; });
+    matchText(sdocs, text, { synIndex: idx, max: 3 }).forEach(function (m) {
+      var x = srcOut[m.doc.id] = srcOut[m.doc.id] || { id: m.doc.id, title: m.doc.item.title, basis: [] };
+      x.basis.push('gemeinsame Wörter mit Titel/Kernaussagen: ' + m.matched.join(', '));
+    });
+
+    var groups = {};
+    REL_ORDER.forEach(function (r) { groups[r] = []; });
+    Object.keys(res).forEach(function (k) { groups[res[k].rel].push(res[k]); });
+    return { groups: groups, sources: Object.keys(srcOut).map(function (k) { return srcOut[k]; }), anchors: anchors.length,
+      negated: stNeg, numbers: stNum };
+  }
+
   global.Analyse = {
     normalize: normalize,
     words: words,
@@ -585,6 +741,10 @@
     analyzeClaims: analyzeClaims,
     openQuestions: openQuestions,
     matchText: matchText,
-    CLAIM_KINDS: KINDS
+    CLAIM_KINDS: KINDS,
+    relate: relate,
+    numbers: numbers,
+    REL_ORDER: REL_ORDER,
+    REL_LABEL: REL_LABEL
   };
 })(typeof self !== 'undefined' ? self : this);

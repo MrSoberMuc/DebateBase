@@ -199,3 +199,11 @@ details.eval summary{cursor:pointer;padding:2px 0}
 .openq li{color:var(--fg)}
 .ck-pruefbar{--cc:var(--accent)}.ck-gemischt{--cc:var(--st-pruefung)}.ck-meinung{--cc:var(--st-umstritten)}.ck-frage{--cc:var(--st-neu)}.ck-aussage,.ck-fragment{--cc:var(--muted)}
 .chip.ck-pruefbar,.chip.ck-gemischt,.chip.ck-meinung,.chip.ck-frage,.chip.ck-aussage,.chip.ck-fragment{color:var(--cc);background:transparent;border:1px solid var(--cc)}
+
+/* Phase 4, Etappe 4: Zusammenhänge */
+.relgrp{margin-top:8px;border-left:4px solid var(--rc,var(--line));padding-left:10px}
+.relgrp h3{margin:0 0 6px;font:600 .8125rem var(--f-display);color:var(--rc,var(--muted))}
+.relgrp .row{margin-top:6px}
+.relrow .basis{display:block;font-size:.75rem;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.rel-widersprechend{--rc:var(--st-widerlegt)}.rel-unterstuetzend{--rc:var(--st-belegt)}.rel-relativierend{--rc:var(--st-pruefung)}.rel-ergaenzend{--rc:var(--accent)}.rel-thematisch{--rc:var(--muted)}.rel-quellen{--rc:var(--st-neu)}
+.chip.rel-chip{color:var(--rc);border:1px solid var(--rc);background:transparent}

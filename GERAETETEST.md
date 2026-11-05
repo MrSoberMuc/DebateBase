@@ -91,6 +91,18 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] J6 Einen echten Beitrag aus X teilen, speichern und prüfen lassen. Notieren, was gut und was falsch erkannt wurde.
 - [ ] J7 App ganz schließen und neu öffnen: Die Analyse ist weg (sie wird absichtlich nicht gespeichert), alle Einträge sind da.
 
+## K. Phase 4, Etappe 4: Zusammenhänge und Widersprüche (ab Version 3.4.0)
+
+*Mit den Beispieldaten testen (Diskussion → Behauptung prüfen).*
+
+- [ ] K1 *Die EU hat 28 Mitgliedstaaten.* → „Widersprechende Inhalte (Kandidaten)“ mit dem Eintrag (Veraltet) und „Grundlage: … als „Veraltet“ markiert“; oben „Mit Widerspruchskandidaten: 1“.
+- [ ] K2 *Die EU hat 27 Mitgliedstaaten.* → derselbe Eintrag unter „Unterstützende Inhalte“ mit „Zahl weicht ab (27 ↔ 28)“.
+- [ ] K3 *Impfstoffe verursachen keinen Autismus.* → unterstützend, Grundlage nennt „Verneinung nur auf einer Seite“.
+- [ ] K4 *Atomwaffen haben seit 1945 einen direkten Krieg zwischen Großmächten verhindert.* → Karte „Abschreckung …“ widersprechend, „Beinahe-Eskalationen …“ relativierend „über Verknüpfung“.
+- [ ] K5 *Der Kalte Krieg war eine spannende Zeit.* → nur „Nur thematisch verwandt“, kein Widerspruch.
+- [ ] K6 Ein Ergebnis antippen → der gespeicherte Eintrag bzw. die Quelle öffnet sich.
+- [ ] K7 Einen echten X-Beitrag prüfen und notieren, welche Zusammenhänge stimmen und welche nicht.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

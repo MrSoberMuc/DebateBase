@@ -81,6 +81,17 @@ Im Bereich **Diskussion → Behauptung prüfen** fügst du einen Text oder X-Bei
 
 Jede Einordnung ist als **unsicher** gekennzeichnet: Es gibt keine KI, die App versteht keine Bedeutung und erkennt keine Ironie. Das Ergebnis wird **nicht gespeichert**. Einzelne Aussagen übernimmst du mit **Als Eintrag speichern** (Formular vorbelegt, Speichern erst nach Bestätigung).
 
+### Zusammenhänge und Widersprüche (ab Version 3.4.0)
+
+Bei **Behauptung prüfen** zeigt DebateBase zu jeder Aussage, wie sie zu deinen gespeicherten Inhalten steht: **widersprechend (Kandidaten)**, **unterstützend**, **relativierend**, **ergänzend**, **nur thematisch verwandt** und **verwandte Quellen**. Unter jedem Treffer steht die **Grundlage**, also der gespeicherte Eintrag und die Regel:
+
+- gleichartige Aussage + Prüfstatus (z. B. ein Eintrag „Widerlegt“ oder „Veraltet“ → Widerspruchskandidat),
+- Behauptung der Gegenseite einer Argumentationskarte (ihr Gegenargument widerspricht),
+- vorhandene Verknüpfungen (Widerspricht, Unterstützt, Relativiert …),
+- abweichende Zahlen und eine Verneinung nur auf einer Seite.
+
+Gemeinsame Wörter allein ergeben nie einen Widerspruch, sondern „nur thematisch verwandt“. Alle Ergebnisse sind Hinweise nach festen Regeln, keine Urteile.
+
 ## 3. X-Beiträge teilen
 
 Voraussetzung: DebateBase ist **installiert**.
