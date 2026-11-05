@@ -1,88 +1,141 @@
 # DebateBase 3
 
-Persönliche Wissensdatenbank für Diskussionen auf X. Alle Daten bleiben auf deinem Gerät (IndexedDB im Browser). Der Server liefert nur die Programmdateien aus.
+Persönliche Wissensdatenbank für Diskussionen auf X (Twitter): Fakten, Definitionen, Studien, Behauptungen, Argumente und Gegenargumente mit Quellen, Prüfstatus und Verknüpfungen.
 
-## Stand: Etappe 4
+**App öffnen:** https://mrsobermuc.github.io/DebateBase/
 
-Neu in Etappe 4 – Teilen aus der X-App:
+- Läuft als installierbare App auf Android (Progressive Web App)
+- Funktioniert nach dem ersten Laden auch ohne Internet
+- **Alle Daten bleiben auf deinem Gerät.** Der Server (GitHub Pages) liefert nur die Programmdateien aus. Es gibt kein Konto, keine Cloud, keine KI-Dienste.
 
-- DebateBase erscheint nach der Installation im Android-Teilen-Menü
-- Geteilte Inhalte (Text, Link, Titel) werden unverändert im Eingang zwischengespeichert
-- Entwurfsansicht: Text und Link getrennt, X-Link geprüft (x.com / twitter.com), Duplikate erkannt
-- Deutlicher Hinweis, wenn X nur den Link übergibt; Inhalte von X werden nie automatisch abgerufen
-- Du entscheidest: speichern (auch direkt als Wissenseintrag oder Behauptung), später entscheiden oder verwerfen
-- Die Originaldaten werden mit dem Beitrag abgelegt
-- Funktioniert auch offline
+---
 
-Aus Etappe 3:
+## Inhalt
 
-Neu in Etappe 3:
+1. [Installieren](#1-installieren)
+2. [Bereiche der App](#2-bereiche-der-app)
+3. [X-Beiträge teilen](#3-x-beiträge-teilen)
+4. [Datensicherung](#4-datensicherung)
+5. [Daten aus Version 2 übernehmen](#5-daten-aus-version-2-übernehmen)
+6. [Updates](#6-updates)
+7. [Wenn etwas nicht klappt](#7-wenn-etwas-nicht-klappt)
+8. [Technik für Neugierige](#8-technik-für-neugierige)
 
-- Installierbar als App über Chrome (Manifest, Service Worker, App-Icons)
-- Startet nach dem ersten Laden auch ohne Internet
-- Schriften werden beim ersten Start offline gespeichert (ohne Internet: Systemschrift)
-- Hinweis „Neue Version verfügbar“ mit Knopf zum Aktualisieren
-- App-Status, Installationsanleitung und Update-Prüfung in den Einstellungen
+---
 
-### Installieren auf Android
+## 1. Installieren
 
-1. `https://mrsobermuc.github.io/DebateBase/` in Chrome öffnen.
-2. Oben rechts auf **⋮** → **App installieren** (oder **Zum Startbildschirm hinzufügen**).
-3. Bestätigen. DebateBase erscheint auf dem Startbildschirm und öffnet sich ohne Browserleiste.
+1. Die Adresse oben in **Chrome** auf dem Handy öffnen (nicht im Inkognito-Modus).
+2. Die Seite einmal neu laden. Unter **Optionen → App** sollte „Bereit: startet auch ohne Internet“ stehen.
+3. Auf **Installieren** tippen (Dashboard oder Optionen) oder in Chrome oben rechts **⋮ → App installieren**.
+4. DebateBase erscheint auf dem Startbildschirm und öffnet sich ohne Browserleiste.
 
-Aus Etappe 2:
+Browser und installierte App nutzen **dieselbe Datenbank** auf dem Gerät.
 
-Neu in Etappe 2:
+## 2. Bereiche der App
 
-- Migrationsassistent für den Export aus Version 1 und 2 sowie für Sicherungsdateien
-- Prüfung ohne Veränderung, Vorschau, Hinweise und übersprungene Datensätze
-- Bei Konflikten (gleiche ID, anderer Inhalt) entscheidest du: behalten, ersetzen oder beide behalten
-- „Komplett ersetzen“ zur Wiederherstellung einer Sicherungsdatei (mit Bestätigung)
-- Import in einem Schritt (alles oder nichts) und Nachkontrolle Datensatz für Datensatz
-- Echter Datei-Download der gesamten Datenbank (Ordner „Downloads“)
-- Bericht zum Kopieren, Importprotokoll in den Einstellungen
+| Bereich | Wofür |
+| --- | --- |
+| **Start** (Dashboard) | Überblick, Schnellzugriff, offene Recherchen, Prüfstatus, Hinweise (geteilte Beiträge, Sicherung) |
+| **Wissen** | Wissenseinträge (Definition, Fakt, Statistik, Studie, Behauptung, Argument, Gegenargument, Meinung, offene Frage) mit Suche und Filtern |
+| **Argumente** | Argumentationskarten: Behauptung der Gegenseite + Gegenargument |
+| **Quellen** | Belege mit Link, Herausgeber, Jahr; zeigt, wo sie zitiert werden |
+| **Diskussion** | Schnellsuche während einer Diskussion, „Für X kopieren“ (max. 280 Zeichen) |
+| **Optionen** | Darstellung, App-Status, Datensicherheit, Datenprüfung, Sicherungen, Import, Teilen |
 
-Aus Etappe 1:
+**Prüfstatus:** Neu · In Prüfung · Belegt · Teilweise belegt · Widerlegt · Umstritten · Veraltet
 
-- Alle Funktionen aus Version 2 übernommen
-- Speicherung jetzt in IndexedDB statt localStorage
-- Jede Änderung wird einzeln und sofort gespeichert
-- Bis zu 5 automatische Sicherungen vor gefährlichen Vorgängen
-- Datenprüfung (findet Verweise ins Leere, löscht nichts)
-- Erster Start mit leerer Datenbank
+**Verknüpfungen** zwischen Einträgen und Karten: Unterstützt · Widerspricht · Ergänzt · Relativiert · Basiert auf · Zitiert
 
+## 3. X-Beiträge teilen
 
-## Dateien
+Voraussetzung: DebateBase ist **installiert**.
+
+1. In der X-App bei einem Beitrag auf **Teilen** tippen und **DebateBase** wählen.
+2. DebateBase öffnet einen **Entwurf**. Noch ist nichts gespeichert.
+3. Prüfen: Link und Text sind getrennt, der Link ist geprüft, Duplikate werden gemeldet.
+4. Entscheiden: **Als X-Beitrag speichern**, **+ Wissenseintrag**, **+ Behauptung**, **Später entscheiden** oder **Verwerfen**.
+
+Gut zu wissen:
+
+- Übergibt X **nur den Link**, zeigt DebateBase das deutlich an. Den Text kannst du in der X-App kopieren und einfügen. DebateBase ruft bei X nie selbst etwas ab.
+- Die übergebenen Originaldaten werden unverändert mit dem Beitrag gespeichert.
+- Nicht entschiedene Beiträge warten im Eingang (Hinweis auf dem Dashboard).
+- Ohne Installation: **X-Beitrag erfassen** und Link/Text von Hand einfügen.
+
+## 4. Datensicherung
+
+Deine Daten liegen in Chrome auf dem Handy. Sie gehen verloren, wenn du Chrome-Daten löschst, Chrome zurücksetzt oder das Handy verlierst. Deshalb:
+
+- **Regelmäßig eine Sicherungsdatei herunterladen:** Optionen → Datensicherung → **Sicherungsdatei herunterladen**. Die Datei landet im Ordner „Downloads“. Lege sie zusätzlich z. B. in Google Drive ab. Das Dashboard erinnert dich, wenn die letzte Datei älter als 14 Tage ist.
+- **Automatische Sicherungen** in der App: Vor jedem Import, Zurücksetzen, Löschen und Wiederherstellen wird der aktuelle Stand gesichert (die letzten 5). Wiederherstellen unter Optionen → Automatische Sicherungen. Diese Sicherungen liegen **auf demselben Gerät** und ersetzen keine Sicherungsdatei.
+- **Wiederherstellen aus einer Datei:** Optionen → **Daten übernehmen oder Sicherung wiederherstellen** → Datei wählen → **Komplett ersetzen** → `ERSETZEN` eintippen.
+- **Datenprüfung** (Optionen): findet Verweise ins Leere, z. B. eine Verknüpfung zu einem gelöschten Eintrag. Sie löscht nichts.
+
+## 5. Daten aus Version 2 übernehmen
+
+Version 2 lief als Claude-Artifact. Dessen Speicher gehört zu einer anderen Webadresse und kann von dieser App **nicht direkt gelesen** werden. Der Weg führt über den Export:
+
+1. Version 2 öffnen → **Optionen** → **Vollständigen Export (JSON) anzeigen** → **JSON kopieren**.
+2. Den Text zusätzlich aufbewahren (z. B. per Mail an dich selbst).
+3. In DebateBase 3: **Daten aus Version 2 übernehmen** (Dashboard) oder Optionen → **Daten übernehmen …**, Text einfügen, **Prüfen**.
+4. Vorschau ansehen. Noch ist nichts gespeichert. Bei Konflikten (gleiche ID, anderer Inhalt) entscheidest du: **Vorhandene behalten**, **Durch Datei ersetzen** oder **Beide behalten**.
+5. **Importieren.** Danach liest die App alles neu ein und vergleicht es Datensatz für Datensatz („Nachkontrolle“).
+6. Gleich danach eine Sicherungsdatei herunterladen.
+
+Erkannt werden Exporte aus Version 1, Version 2 und Sicherungsdateien von Version 3. Alle Felder werden unverändert übernommen, auch unbekannte. Der Import geschieht in einem Schritt: entweder vollständig oder gar nicht.
+
+## 6. Updates
+
+Wenn eine neue Version veröffentlicht ist, erscheint in der App **„Eine neue Version von DebateBase ist bereit“**. Tippe auf **Jetzt aktualisieren**. Ohne deine Bestätigung wird nichts getauscht. Manuell: Optionen → App → **Nach Updates suchen**. Updates ändern deine Daten nicht.
+
+## 7. Wenn etwas nicht klappt
+
+| Problem | Lösung |
+| --- | --- |
+| Rote Meldung „Nicht dauerhaft gespeichert“ | Chrome nicht im Inkognito-Modus verwenden. App neu laden. |
+| „Installieren“ fehlt | Seite einmal neu laden und kurz warten. Sonst Chrome **⋮ → App installieren** bzw. **Zum Startbildschirm hinzufügen**. |
+| DebateBase fehlt im Teilen-Menü | App muss installiert sein. Nach einem Update mit neuer Teilen-Funktion ggf. **deinstallieren und neu installieren** (Daten bleiben erhalten, vorher trotzdem Sicherungsdatei herunterladen). |
+| Import meldet „abgeschnitten“ | Beim Kopieren ging ein Teil verloren. In Version 2 erneut **JSON kopieren** und vollständig einfügen. |
+| Nach dem Import fehlt etwas | „Bericht kopieren“ und prüfen. Stand vor dem Import: Optionen → Automatische Sicherungen → Wiederherstellen. |
+| Schrift sieht offline anders aus | Die Schriften werden beim ersten Start mit Internet gespeichert. Ohne sie nutzt die App die Android-Schrift. Funktion ist nicht betroffen. |
+| Andere Fehler | Optionen → Datenprüfung ansehen; Sicherungsdatei herunterladen; Fehlerbericht kopieren. |
+
+## 8. Technik für Neugierige
+
+### Dateien
 
 | Datei | Aufgabe |
 | --- | --- |
 | `index.html` | Grundgerüst der Seite |
-| `styles.css` | Gestaltung (aus Version 2) |
-| `app.js` | Oberfläche und Bedienung |
-| `db.js` | Datenbank (IndexedDB) |
-| `migrate.js` | Import, Prüfung, Konflikte, Nachkontrolle |
-| `manifest.json` | Angaben für die Installation als App |
-| `service-worker.js` | Offline-Speicher der App-Dateien, Updates |
+| `styles.css` | Gestaltung (Hell/Dunkel, Mobile First) |
+| `app.js` | Oberfläche, Bedienung, Teilen-Eingang, Installation |
+| `db.js` | Datenbank (IndexedDB) mit Versionierung und Transaktionen |
+| `migrate.js` | Import: Format erkennen, prüfen, Konflikte, Nachkontrolle |
+| `service-worker.js` | Offline-Speicher der App-Dateien, Updates, Empfang geteilter Beiträge |
+| `manifest.json` | Angaben für Installation und Teilen-Ziel |
 | `icons/` | App-Icons (erzeugt mit `tools/make-icons.py`) |
-| `tests/` | Automatische Tests, werden für den Betrieb nicht gebraucht |
+| `tests/` | Automatische Tests (für den Betrieb nicht nötig) |
+| `GERAETETEST.md` | Checkliste für den Test auf dem Android-Gerät |
 
-## Veröffentlichen mit GitHub Pages
+### Datenbank „debatebase“ (IndexedDB, Version 1)
 
-1. Dateien in das Repository hochladen (Hauptordner).
-2. Auf github.com im Repository: **Settings → Pages**.
-3. Bei „Source“ **Deploy from a branch** wählen, Branch **main**, Ordner **/ (root)**, **Save**.
-4. Nach 1–2 Minuten ist die App erreichbar unter `https://<benutzername>.github.io/<repository>/`.
+`entries`, `args`, `sources`, `links`, `posts` (Datensätze) · `topics`, `tags` (automatisch gepflegt) · `settings`, `meta` · `inbox` (geteilte Beiträge vor der Entscheidung) · `backups` (automatische Sicherungen)
 
-## Tests ausführen
+Jede Änderung wird sofort als Transaktion gespeichert („Write-through“). Spätere Änderungen am Aufbau laufen als nummerierte Schritte in `db.js` (`MIGRATIONS`), ohne vorhandene Daten zu verlieren.
+
+### Neue Version veröffentlichen
+
+1. Dateien ändern.
+2. In `service-worker.js` die `VERSION` erhöhen, neue Dateien in `APP_FILES` eintragen. In `app.js` `APP_VERSION` anpassen.
+3. Hochladen (Branch `main`). GitHub Pages veröffentlicht automatisch.
+
+### Automatische Tests
+
+Benötigt Node.js, Playwright und Google Chrome:
 
 ```
-node tests/migrate.unit.test.mjs
-node tests/etappe1.test.mjs
-node tests/etappe2.test.mjs
-node tests/etappe3.test.mjs
-node tests/etappe4.test.mjs
+node tests/run-all.mjs
 ```
 
-Wichtig bei Änderungen: In `service-worker.js` die `VERSION` erhöhen und neue Dateien in `APP_FILES` eintragen, sonst bekommt die installierte App das Update nicht.
-
-Benötigt Node.js, Playwright und Google Chrome.
+Die Tests laufen in Chrome ohne Bildschirm. Der Testserver liegt wie GitHub Pages in einem Unterordner. Sie prüfen u. a. Speichern und Neustart, Import und Konflikte, Datei-Export, Installierbarkeit, Offline-Betrieb, Updates und verschiedene Varianten des Android-Teilens. **Sie ersetzen nicht den Test auf dem echten Gerät** (siehe `GERAETETEST.md`).
