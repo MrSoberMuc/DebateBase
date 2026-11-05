@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.0.0-etappe3';
+var APP_VERSION='3.0.0-etappe4';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -393,9 +393,55 @@ function parseShared(raw){
  raw=String(raw||'');var m=raw.match(/https?:\/\/[^\s]+/g)||[];
  for(var i=0;i<m.length;i++){if(parseXUrl(m[i]))return {url:m[i],text:raw.replace(m[i],'').replace(/\s+\n/g,'\n').trim()}}
  return {url:'',text:raw.trim()}}
-/* Für das Android-Teilen vorbereitet (wird in Etappe 4 angebunden). */
-function handleSharedPayload(p){var s=parseShared([p.text,p.url].filter(Boolean).join(' '));postForm(null,{url:s.url||p.url||'',text:s.text||p.title||''})}
-window.DebateBaseShare=handleSharedPayload;
+/* ================= Android-Teilen: Eingang =================
+ * Der Service Worker legt geteilte Inhalte unverändert im Eingang (Store „inbox“) ab.
+ * Hier werden sie angezeigt; gespeichert wird erst nach deiner Entscheidung. */
+var Inbox={items:[],
+ load:function(){var self=this;if(!Repo.ready)return Promise.resolve([]);return DB.getAll('inbox').then(function(r){self.items=r.sort(function(a,b){return a.received-b.received});return self.items},function(){return []})},
+ get:function(id){return this.items.filter(function(x){return x.id===id})[0]},
+ remove:function(id){var self=this;return DB.write({del:{inbox:[id]}}).then(function(){self.items=self.items.filter(function(x){return x.id!==id})})}};
+var URLRE=/https?:\/\/[^\s<>"]+/g;
+function cleanUrl(u){return String(u).replace(/[)\].,;:!?»«“”"'’]+$/,'')}
+/* Zerlegt die übergebenen Felder: X-Link finden und prüfen, Text ohne Link, Duplikat erkennen. */
+function analyzeShare(it){
+ var title=String(it.title||''),text=String(it.text||''),url=String(it.url||''),urls=[];
+ [url,text,title].forEach(function(f){(f.match(URLRE)||[]).forEach(function(u){urls.push(cleanUrl(u))})});
+ var x=null,xraw='',other='';
+ urls.forEach(function(u){var p=parseXUrl(u);if(p&&!x){x=p;xraw=u}else if(!p&&!other)other=u});
+ var body=text;
+ (text.match(URLRE)||[]).forEach(function(u){if(parseXUrl(cleanUrl(u)))body=body.split(u).join('')});
+ body=body.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+ var dup=x?Repo.all('posts').filter(function(p){return p.tweetId===x.tweetId})[0]:null;
+ return {x:x,xraw:xraw,other:other,text:body,onlyLink:!!x&&!body,dup:dup,title:title.trim(),fieldsUsed:[title?'Titel':'',text?'Text':'',url?'Link':''].filter(Boolean)}}
+var shareCur=null;
+function shareSheet(id){
+ var it=Inbox.get(id);if(!it){toast('Dieser geteilte Beitrag ist nicht mehr vorhanden.');return}
+ var a=analyzeShare(it);shareCur={id:id,a:a};
+ var n=Inbox.items.length,h=sheetHead('Geteilter X-Beitrag','<p class="note" style="margin:0">Über die Android-Teilen-Funktion empfangen'+(n>1?' · '+n+' warten':'')+' · noch nicht gespeichert</p>');
+ if(a.dup){
+  h+='<div class="card alert"><p><b>Dieser Beitrag ist bereits gespeichert</b> (seit '+fmtDate(a.dup.created)+').</p></div>'+
+  '<div class="btns"><button class="btn" data-act="share-open-dup" data-id="'+esc(a.dup.id)+'">Gespeicherten Beitrag öffnen</button><button class="btn danger" data-act="share-discard">Verwerfen</button></div>'+
+  shareRaw(it)+'<div class="btns"><button class="btn" data-act="close">Später entscheiden</button></div>';
+  openSheet(h);return}
+ if(a.onlyLink)h+='<div class="card alert"><p><b>X hat nur den Link übergeben, keinen Beitragstext.</b> Den Text liest DebateBase nicht selbst aus. Wenn du ihn speichern willst: in der X-App lange auf den Beitrag tippen, Text kopieren und unten einfügen. Du kannst auch nur den Link speichern.</p></div>';
+ if(!a.x&&a.other)h+='<div class="card alert"><p><b>Der geteilte Link stammt nicht von X oder Twitter:</b><br><span style="overflow-wrap:anywhere">'+esc(a.other)+'</span><br>Er wird nicht als Beitragslink übernommen. Du findest ihn unten in den Originaldaten.</p></div>';
+ if(!a.x&&!a.other)h+='<div class="card"><p style="color:var(--fg);margin:0">Es wurde kein Link übergeben, nur Text.</p></div>';
+ h+='<form data-form="post" data-id="" data-inbox="'+esc(id)+'" class="stack" novalidate>'+
+ '<div class="field"><label for="p-url">Link zum Beitrag'+(a.x?' <span class="chip st st-belegt">X-Link geprüft</span>':'')+'</label><input id="p-url" name="url" inputmode="url" autocomplete="off" value="'+esc(a.x?a.x.url:'')+'" placeholder="https://x.com/name/status/123…"></div>'+
+ '<div class="field"><label for="p-text">Beitragstext</label><textarea id="p-text" name="text" placeholder="'+(a.onlyLink?'Beitragstext hier einfügen (optional)':'Text des Beitrags')+'">'+esc(a.text)+'</textarea></div>'+
+ '<div class="field"><label for="p-topic">Thema zuordnen</label><input id="p-topic" name="topic" list="topics3" placeholder="Bestehendes Thema wählen oder neu eingeben"><datalist id="topics3">'+allTopics().map(function(t){return '<option value="'+esc(t)+'">'}).join('')+'</datalist></div>'+
+ '<div class="field"><label for="p-note">Eigene Notiz (optional)</label><textarea class="sm" id="p-note" name="note"></textarea></div>'+
+ '<p class="err" id="err" hidden></p>'+
+ '<div class="btns"><button type="submit" class="btn primary" name="mode" value="save">Als X-Beitrag speichern</button></div>'+
+ '<div class="btns"><button type="submit" class="btn" name="mode" value="fakt">Speichern + Wissenseintrag</button><button type="submit" class="btn" name="mode" value="behauptung">Speichern + Behauptung</button></div>'+
+ '<div class="btns"><button type="button" class="btn" data-act="close">Später entscheiden</button><button type="button" class="btn danger" data-act="share-discard">Verwerfen</button></div></form>'+shareRaw(it);
+ openSheet(h)}
+function shareRaw(it){
+ var row=function(k,v){return '<dt>'+k+'</dt><dd class="body">'+(v?esc(v):'<span style="color:var(--muted)">(leer)</span>')+'</dd>'};
+ return '<details class="card"><summary><b>Übergebene Originaldaten</b></summary><p class="note" style="margin:6px 0">So hat Android die Inhalte übergeben, unverändert. Sie werden beim Speichern mit abgelegt.</p><dl>'+row('Titel',it.title)+row('Text',it.text)+row('Link',it.url)+row('Empfangen',fmtSaved(it.received))+'</dl></details>'}
+function inboxCard(){var n=Inbox.items.length;if(!n)return '';
+ return '<div class="card welcome"><h3>'+(n===1?'1 geteilter Beitrag wartet':n+' geteilte Beiträge warten')+'</h3><p>Aus der Android-Teilen-Funktion. Entscheide, ob du '+(n===1?'ihn':'sie')+' speichern willst.</p><div class="btns" style="margin-top:12px"><button class="btn primary" data-act="share-next">Ansehen</button></div></div>'}
+function afterShareDecision(){var next=Inbox.items[0];render();if(next)setTimeout(function(){shareSheet(next.id)},0)}
 function postTitle(p){var t=String(p.text||'').replace(/\s+/g,' ').trim();if(!t)return p.handle?'Beitrag von @'+p.handle:'X-Beitrag';var s=t.split(/(?<=[.!?])\s/)[0];return (s.length>90?s.slice(0,87).trimEnd()+'…':s)}
 function postCard(p){
  var n=(p.convertedTo||[]).filter(function(i){return Repo.get('entries',i)}).length;
@@ -423,10 +469,12 @@ function savePost(f,mode){
  if(url){x=parseXUrl(url);if(!x){er.textContent='Das ist kein gültiger X-Link. Erwartet wird z. B. https://x.com/name/status/123456.';er.hidden=false;$('#p-url').focus();return}
   var dup=Repo.all('posts').filter(function(p){return p.id!==id&&p.tweetId===x.tweetId})[0];
   if(dup){er.textContent='Dieser Beitrag ist bereits gespeichert.';er.hidden=false;return}}
- var old=id?Repo.get('posts',id):null;
+ var old=id?Repo.get('posts',id):null,inboxId=f.dataset.inbox||'',inItem=inboxId?Inbox.get(inboxId):null;
  var o=Object.assign({},old||{},{id:id||uid('p'),url:x?x.url:'',handle:x?x.handle:'',tweetId:x?x.tweetId:'',text:text,topic:String(d.get('topic')).trim(),note:String(d.get('note')).trim(),convertedTo:old?old.convertedTo||[]:[],created:old?old.created:Date.now()});
- Repo.put('posts',o).then(function(){closeSheet();render();
-  if(mode==='fakt'||mode==='behauptung')postToEntry(o.id,mode);else toast('Beitrag gespeichert')})}
+ /* Bei geteilten Beiträgen: Originaldaten unverändert mitspeichern */
+ if(inItem)o.shared={title:inItem.title,text:inItem.text,url:inItem.url,received:inItem.received};
+ Repo.put('posts',o).then(function(){return inboxId?Inbox.remove(inboxId):null}).then(function(){closeSheet();render();
+  if(mode==='fakt'||mode==='behauptung')postToEntry(o.id,mode);else{toast('Beitrag gespeichert');if(inboxId)afterShareDecision()}})}
 function postToEntry(pid,mode){
  var p=Repo.get('posts',pid);if(!p)return;
  entryForm(null,{title:postTitle(p),description:p.text,type:mode,status:'neu',topic:p.topic,postId:p.id,evidence:''})}
@@ -436,7 +484,7 @@ function postDetail(id){
  openSheet(sheetHead(p.handle?'Beitrag von @'+p.handle:'X-Beitrag','<div class="meta">'+(p.topic?'<span class="chip">'+esc(p.topic)+'</span>':'')+'<span class="chip tag">'+fmtDate(p.created)+'</span></div>')+
  '<p class="body" style="margin:0">'+esc(p.text||'(kein Text gespeichert)')+'</p>'+
  (p.url?'<p style="margin:0"><a href="'+esc(p.url)+'" target="_blank" rel="noopener noreferrer" style="color:var(--accent);overflow-wrap:anywhere">'+esc(p.url)+'</a></p>':'')+
- (p.note?'<dl><dt>Notiz</dt><dd>'+esc(p.note)+'</dd></dl>':'')+
+ (p.note?'<dl><dt>Notiz</dt><dd>'+esc(p.note)+'</dd></dl>':'')+(p.shared?shareRaw({title:p.shared.title,text:p.shared.text,url:p.shared.url,received:p.shared.received}).replace('Sie werden beim Speichern mit abgelegt.','Über die Android-Teilen-Funktion empfangen.'):'')+
  '<div class="sec"><h2>Daraus erstellt ('+E.length+')</h2>'+(E.length?E.map(function(e){return '<button class="row" data-act="open-entry" data-id="'+esc(e.id)+'"><div><b>'+esc(e.title)+'</b><small>'+esc(TYPES[e.type]||e.type)+'</small></div>'+stChip(e.status)+'</button>'}).join(''):'<p class="note">Noch kein Eintrag aus diesem Beitrag erstellt.</p>')+'</div>'+
  '<div class="btns"><button class="btn" data-act="post-entry" data-id="'+esc(id)+'" data-v="fakt">Als Wissenseintrag</button><button class="btn" data-act="post-entry" data-id="'+esc(id)+'" data-v="behauptung">Als Behauptung</button></div>'+
  '<div class="btns"><button class="btn" data-act="edit-post" data-id="'+esc(id)+'">'+ic('edit',18)+'Bearbeiten</button><button class="btn danger" data-act="del-post" data-id="'+esc(id)+'">'+ic('trash',18)+'Löschen</button></div>')}
@@ -643,9 +691,9 @@ function viewSettings(){
  '<button class="btn block" data-act="export">JSON anzeigen und kopieren</button><textarea class="mono" id="exp" readonly hidden aria-label="Export"></textarea><button class="btn block" id="expCopy" data-act="copy-export" hidden>'+ic('copy',18)+'JSON kopieren</button></section>'+
  '<section class="sec" id="sec-import"><h2>Import und Wiederherstellung</h2><button class="btn block" data-act="open-migration">Daten übernehmen oder Sicherung wiederherstellen</button><p class="note">Für den Export aus Version 2 und für Sicherungsdateien. Du siehst vor dem Speichern eine Vorschau und entscheidest bei Konflikten selbst.</p>'+migLog()+'</section>'+
  '<section class="sec"><h2>X-Beiträge</h2><button class="btn block" data-act="new-post">'+ic('link',18)+'X-Beitrag erfassen</button>'+
- '<div class="card"><div class="meta"><b style="font-family:var(--f-display)">Android-Teilen</b><span class="chip st st-pruefung">Folgt in Etappe 4</span></div><p style="margin-top:8px">Teilen aus der X-App direkt nach DebateBase wird angebunden, sobald die App installierbar ist (Manifest und Service Worker). Bis dahin X-Beiträge bitte über „X-Beitrag erfassen“ einfügen.</p></div></section>'+
+ '<div class="card"><div class="meta"><b style="font-family:var(--f-display)">Android-Teilen</b>'+(pwa.standalone?'<span class="chip st st-belegt">Aktiv</span>':'<span class="chip st st-pruefung">Nach Installation</span>')+'</div><p style="margin-top:8px">In der X-App bei einem Beitrag auf <b>Teilen</b> tippen und <b>DebateBase</b> wählen. Der Beitrag landet zuerst im Eingang; du entscheidest danach, ob er gespeichert wird. DebateBase erscheint erst im Teilen-Menü, wenn die App installiert ist (siehe oben „App“).</p>'+(Inbox.items.length?'<button class="btn block" style="margin-top:10px" data-act="share-next">Eingang ansehen ('+Inbox.items.length+')</button>':'')+'</div></section>'+
  '<section class="sec"><h2>Zurücksetzen</h2><button class="btn block" data-act="reset-sample">Beispieldaten wiederherstellen</button><button class="btn block danger" data-act="wipe">Alle Daten löschen</button></section>'+
- '<p class="note">DebateBase '+esc(APP_VERSION)+'. Teilen aus der X-App folgt in Etappe 4. Beispieldaten dienen nur zur Demonstration, bitte Fakten vor der Verwendung selbst prüfen.</p>'}
+ '<p class="note">DebateBase '+esc(APP_VERSION)+'. Beispieldaten dienen nur zur Demonstration, bitte Fakten vor der Verwendung selbst prüfen.</p>'}
 function migLog(){var L=(Repo.db.meta.migrations||[]).slice(-3).reverse();if(!L.length)return '';
  return '<div class="card"><p style="color:var(--fg);margin:0 0 4px"><b>Letzte Importe</b></p><ul class="issues">'+L.map(function(m){return '<li>'+fmtSaved(m.at)+': '+esc(m.format)+', '+(m.mode==='replace'?'ersetzt':'zusammengeführt')+', '+m.written+' Datensätze, Nachkontrolle '+m.verified+'/'+m.written+(m.problems?' – '+m.problems+' Probleme':' ✓')+'</li>'}).join('')+'</ul></div>'}
 function paintUsage(){var el=$('#usage');if(!el)return;DB.estimate().then(function(e){if(!el.isConnected)return;el.textContent=e&&e.usage!=null?(e.usage/1048576).toFixed(2).replace('.',',')+' MB':'Unbekannt'})}
@@ -690,7 +738,7 @@ function viewDashboard(){
  var recent=[].concat(E.map(function(o){return {k:'Wissen',a:'open-entry',o:o,t:o.created}}),S.map(function(o){return {k:'Quelle',a:'open-source',o:o,t:o.created}}),A.map(function(o){return {k:'Argument',a:'open-arg',o:o,t:o.created}})).sort(function(a,b){return b.t-a.t}).slice(0,6);
  var cnt={};E.forEach(function(e){cnt[e.status]=(cnt[e.status]||0)+1});
  var keys=Object.keys(STATUS).filter(function(k){return cnt[k]});
- return welcomeCard()+installCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
+ return inboxCard()+welcomeCard()+installCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
  '<section class="sec"><h2>Neu anlegen</h2><div class="actions"><button class="btn primary" data-act="new-entry">'+ic('plus',18)+'Neuer Eintrag</button><button class="btn" data-act="new-source">'+ic('plus',18)+'Neue Quelle</button><button class="btn" data-act="new-arg">'+ic('plus',18)+'Neue Karte</button><button class="btn" data-act="new-research">'+ic('search',18)+'Neue Recherche</button><button class="btn block" style="grid-column:1/-1" data-act="new-post">'+ic('link',18)+'X-Beitrag erfassen</button></div></section>'+
  '<section class="sec"><div class="sec-h"><h2>Offene Recherchen ('+open.length+')</h2></div>'+(open.length?open.map(function(e){return '<button class="row" data-act="open-entry" data-id="'+esc(e.id)+'"><div><b>'+esc(e.title)+'</b><small>'+esc(TYPES[e.type]||e.type)+(e.topic?' · '+esc(e.topic):'')+'</small></div>'+stChip(e.status)+'</button>'}).join(''):empty('Keine offenen Recherchen. Offene Fragen und Einträge „In Prüfung“ erscheinen hier.'))+'</section>'+
  (recent.length?'<section class="sec"><h2>Zuletzt hinzugefügt</h2>'+recent.map(function(r){return '<button class="row" data-act="'+r.a+'" data-id="'+esc(r.o.id)+'"><span class="kind">'+r.k+'</span><div><b>'+esc(r.o.title)+'</b><small>'+rel(r.t)+'</small></div></button>'}).join('')+'</section>':'')+
@@ -800,6 +848,9 @@ document.addEventListener('click',function(ev){
   case 'mig-copy-report':copy(migReport(),'Bericht kopiert');break;
   case 'download':downloadExport();break;
   case 'install':installApp();break;
+  case 'share-next':if(Inbox.items[0])shareSheet(Inbox.items[0].id);break;
+  case 'share-open-dup':postDetail(id);break;
+  case 'share-discard':if(armed(b,'Wirklich verwerfen?')&&shareCur){Inbox.remove(shareCur.id).then(function(){closeSheet();toast('Geteilten Beitrag verworfen');afterShareDecision()})}break;
   case 'hide-install':Repo.setMeta('installHintHidden',Date.now()).then(render);break;
   case 'apply-update':applyUpdate();break;
   case 'check-update':checkUpdate();break;
@@ -840,12 +891,17 @@ if(window.matchMedia)try{matchMedia('(prefers-color-scheme: dark)').addEventList
 DB.onBlocked=function(){toast('Bitte andere geöffnete DebateBase-Tabs schließen.',true)};
 DB.onVersionChange=function(){Repo.ready=false;updateSaved();toast('Eine neue Version ist aktiv. Bitte die App neu laden.',true)};
 setupPWA();
-Repo.load().then(function(){
+Repo.load().then(function(){return Inbox.load()}).then(function(){
  updateSaved();route();
+ var qs=new URLSearchParams(location.search),sid=qs.get('geteilt');
+ if(qs.has('geteilt')||qs.has('teilenfehler')||qs.has('quelle'))history.replaceState(null,'',location.pathname+location.hash);
+ if(qs.has('teilenfehler'))toast('Der geteilte Inhalt konnte nicht übernommen werden. Bitte erneut teilen.',true);
+ else if(sid&&Inbox.get(sid))shareSheet(sid);
+ else if(sid&&Inbox.items.length)shareSheet(Inbox.items[0].id);
  var iss=Repo.ready?checkIntegrity():[];
  if(iss.length)toast('Datenprüfung: '+iss.length+' Auffälligkeiten, siehe Einstellungen',true);
  return DB.requestPersist().then(function(p){Repo.persisted=p;if(ui.route==='einstellungen')render()});
 });
 /* Für automatische Tests */
-window.DebateBase={Repo:Repo,checkIntegrity:checkIntegrity,buildExport:buildExport,version:APP_VERSION,pwa:pwa};
+window.DebateBase={Inbox:Inbox,analyzeShare:analyzeShare,Repo:Repo,checkIntegrity:checkIntegrity,buildExport:buildExport,version:APP_VERSION,pwa:pwa};
 })();

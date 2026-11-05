@@ -2,7 +2,19 @@
 
 Persönliche Wissensdatenbank für Diskussionen auf X. Alle Daten bleiben auf deinem Gerät (IndexedDB im Browser). Der Server liefert nur die Programmdateien aus.
 
-## Stand: Etappe 3
+## Stand: Etappe 4
+
+Neu in Etappe 4 – Teilen aus der X-App:
+
+- DebateBase erscheint nach der Installation im Android-Teilen-Menü
+- Geteilte Inhalte (Text, Link, Titel) werden unverändert im Eingang zwischengespeichert
+- Entwurfsansicht: Text und Link getrennt, X-Link geprüft (x.com / twitter.com), Duplikate erkannt
+- Deutlicher Hinweis, wenn X nur den Link übergibt; Inhalte von X werden nie automatisch abgerufen
+- Du entscheidest: speichern (auch direkt als Wissenseintrag oder Behauptung), später entscheiden oder verwerfen
+- Die Originaldaten werden mit dem Beitrag abgelegt
+- Funktioniert auch offline
+
+Aus Etappe 3:
 
 Neu in Etappe 3:
 
@@ -39,7 +51,6 @@ Aus Etappe 1:
 - Datenprüfung (findet Verweise ins Leere, löscht nichts)
 - Erster Start mit leerer Datenbank
 
-Noch nicht enthalten: Teilen aus der X-App (Etappe 4).
 
 ## Dateien
 
@@ -69,6 +80,7 @@ node tests/migrate.unit.test.mjs
 node tests/etappe1.test.mjs
 node tests/etappe2.test.mjs
 node tests/etappe3.test.mjs
+node tests/etappe4.test.mjs
 ```
 
 Wichtig bei Änderungen: In `service-worker.js` die `VERSION` erhöhen und neue Dateien in `APP_FILES` eintragen, sonst bekommt die installierte App das Update nicht.
