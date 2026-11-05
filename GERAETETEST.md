@@ -136,6 +136,18 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] N7 Nur einen Teil der Antwort einfügen → verständliche Meldung „abgeschnitten“.
 - [ ] N8 Optionen → Datensicherheit: Anzahl Einträge, Quellen, Karten, Verknüpfungen ist unverändert.
 
+## O. Phase 4B, Etappe 3: KI-Antwort übernehmen (ab Version 3.8.0)
+
+*Vorher unbedingt eine Sicherungsdatei herunterladen.*
+
+- [ ] O1 KI-Antwort einfügen → Prüfen → Auswahl anpassen → **Übernehmen** → „KI-Antwort übernommen“ mit „Nachkontrolle: x von x ✓“.
+- [ ] O2 Die neuen Einträge, Karten und Quellen zeigen „KI-Vorschlag“; in der Detailansicht steht der Hinweis „Aus einer KI-Antwort übernommen …“.
+- [ ] O3 Dashboard: „… KI-Vorschläge sind noch ungeprüft“ mit Knöpfen für Einträge und Karten; die Suche nach „KI-Vorschlag“ findet sie.
+- [ ] O4 Die Verknüpfungen erscheinen in den Detailansichten so, wie du sie in der Vorschau gewählt hast.
+- [ ] O5 Dieselbe Antwort noch einmal einfügen → alles als Dublette erkannt, „Übernehmen“ ist gesperrt.
+- [ ] O6 Optionen → Automatische Sicherungen: „Vor Übernahme einer KI-Antwort“ ist vorhanden. Wiederherstellen (zweimal tippen) → Stand vor der Übernahme.
+- [ ] O7 Optionen → Datenprüfung: keine Auffälligkeiten.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

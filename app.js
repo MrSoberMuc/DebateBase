@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.7.0';
+var APP_VERSION='3.8.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -215,9 +215,9 @@ function synIdx(){var u=userSynonyms(),k=JSON.stringify(u);if(synCache.key!==k){
 function srcText(ids){return (ids||[]).map(function(i){var s=Repo.get('sources',i);return s?s.title+' '+(s.publisher||''):''}).join(' ; ')}
 function docFor(k,o){
  var f=function(label,weight,text){return {label:label,weight:weight,text:text==null?'':String(text)}},fields;
- if(k==='entries')fields=[f('Titel',5,o.title),f('Tags',4,(o.tags||[]).join(', ')),f('Kernaussage',3,o.claimCore),f('Themengebiet',3,o.topic),f('Quellen',2,srcText(o.sourceIds)),f('Beschreibung',2,o.description),f('Begründung',1,o.reason),f('Evidenz',1,o.evidence),f('Einschränkungen',1,o.limits),f('Schlussfolgerung',1,o.conclusion),f('Typ und Status',1,(TYPES[o.type]||o.type||'')+' '+(STATUS[o.status]||o.status||'')),f('Verknüpfungen',1,linkText('entries',o.id))];
- else if(k==='args')fields=[f('Titel',5,o.title),f('Behauptung',3,o.claim),f('Themengebiet',3,o.topic),f('Gegenargument',2,o.counter),f('Quellen',2,srcText(o.sourceIds)),f('Status',1,STATUS[o.status]||o.status),f('Verknüpfungen',1,linkText('args',o.id))];
- else if(k==='sources')fields=[f('Titel',5,o.title),f('Herausgeber',3,o.publisher),f('Autor',3,o.author),f('Kernaussagen',2,o.keyClaims),f('Jahr',2,o.year),f('Quellentyp',2,o.kind),f('Methodik',1,o.method),f('Einschränkungen',1,o.limitations),f('Interessenkonflikte',1,o.conflicts),f('Notiz',1,o.note)];
+ if(k==='entries')fields=[f('Titel',5,o.title),f('Tags',4,(o.tags||[]).join(', ')),f('Kernaussage',3,o.claimCore),f('Themengebiet',3,o.topic),f('Quellen',2,srcText(o.sourceIds)),f('Beschreibung',2,o.description),f('Begründung',1,o.reason),f('Evidenz',1,o.evidence),f('Einschränkungen',1,o.limits),f('Schlussfolgerung',1,o.conclusion),f('Typ und Status',1,(TYPES[o.type]||o.type||'')+' '+(STATUS[o.status]||o.status||'')+(isKi(o)?' KI-Vorschlag':'')),f('Verknüpfungen',1,linkText('entries',o.id))];
+ else if(k==='args')fields=[f('Titel',5,o.title),f('Behauptung',3,o.claim),f('Themengebiet',3,o.topic),f('Gegenargument',2,o.counter),f('Quellen',2,srcText(o.sourceIds)),f('Status',1,(STATUS[o.status]||o.status||'')+(isKi(o)?' KI-Vorschlag':'')),f('Verknüpfungen',1,linkText('args',o.id))];
+ else if(k==='sources')fields=[f('Titel',5,o.title),f('Herausgeber',3,o.publisher),f('Autor',3,o.author),f('Kernaussagen',2,o.keyClaims),f('Jahr',2,o.year),f('Quellentyp',2,o.kind),f('Methodik',1,o.method),f('Einschränkungen',1,o.limitations),f('Interessenkonflikte',1,o.conflicts),f('Notiz',1,(o.note||'')+(isKi(o)?' KI-Vorschlag':''))];
  else fields=[f('Beitragstext',3,o.text),f('Konto',3,o.handle),f('Thema',3,o.topic),f('Notiz',1,o.note),f('Link',1,o.url)];
  return {id:o.id,kind:k,item:o,fields:fields,tags:o.tags||[],sourceIds:o.sourceIds||[],topic:o.topic||''}}
 function smartSearch(k,list,q){return Analyse.search(list.map(function(o){return docFor(k,o)}),q,{synIndex:synIdx()})}
@@ -287,7 +287,7 @@ function saveEntry(f){
 function entryDetail(id){
  var e=Repo.get('entries',id);if(!e)return;
  var S=(e.sourceIds||[]).map(function(i){return Repo.get('sources',i)}).filter(Boolean);
- openSheet(sheetHead(e.title,'<div class="meta"><span class="chip">'+esc(TYPES[e.type]||e.type)+'</span>'+stChip(e.status)+'</div>')+
+ openSheet(sheetHead(e.title,'<div class="meta"><span class="chip">'+esc(TYPES[e.type]||e.type)+'</span>'+stChip(e.status)+kiChip(e)+'</div>')+kiNote(e)+
  (e.description?'<p class="body" style="margin:0">'+esc(e.description)+'</p>':'<p class="note">Keine Beschreibung.</p>')+
  extraView(e)+postOrigin(e)+'<dl><dt>Themengebiet</dt><dd>'+esc(e.topic||'–')+'</dd><dt>Tags</dt><dd>'+((e.tags||[]).length?e.tags.map(function(t){return '<span class="chip tag">'+esc(t)+'</span>'}).join(' '):'–')+'</dd><dt>Erstellt</dt><dd>'+fmtDate(e.created)+'</dd><dt>Geändert</dt><dd>'+fmtDate(e.updated||e.created)+'</dd></dl>'+
  '<div class="sec"><h2>Quellen</h2>'+(S.length?S.map(function(s){return '<button class="row" data-act="open-source" data-id="'+esc(s.id)+'"><div><b>'+esc(s.title)+'</b><small>'+esc(s.publisher||'')+(s.year?', '+esc(s.year):'')+'</small></div></button>'}).join(''):'<p class="note">Keine Quelle verknüpft.</p>')+'</div>'+
@@ -360,7 +360,7 @@ function sourceDetail(id){
  var s=Repo.get('sources',id);if(!s)return;var C=citedBy(id),CA=citedByArgs(id),D=srcDoc(s);
  var val=function(v,multi){v=String(v||'').trim();return v?(multi?'<span class="body">'+esc(v)+'</span>':esc(v)):'<span class="na">nicht angegeben</span>'};
  var claims=C.filter(function(e){return CLAIM_TYPES.indexOf(e.type)>=0});
- openSheet(sheetHead(s.title,'<div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+docChip(s)+'</div>')+
+ openSheet(sheetHead(s.title,'<div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+docChip(s)+kiChip(s)+'</div>')+kiNote(s,true)+
  '<dl><dt>Herausgeber</dt><dd>'+val(s.publisher)+'</dd><dt>Autor</dt><dd>'+val(s.author)+'</dd><dt>Veröffentlicht</dt><dd>'+val(fmtSrcDate(s))+'</dd><dt>Link</dt><dd>'+(s.url?'<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">'+esc(s.url)+'</a>':'–')+'</dd><dt>Notiz</dt><dd>'+esc(s.note||'–')+'</dd></dl>'+
  '<div class="sec" id="src-eval"><h2>Quellenbewertung</h2><dl>'+
  '<dt>Methodik</dt><dd>'+(METHOD_KINDS.indexOf(s.kind)>=0||String(s.method||'').trim()?val(s.method,1):'<span class="na">für „'+esc(s.kind)+'“ meist nicht nötig</span>')+'</dd>'+
@@ -396,7 +396,7 @@ function saveArg(f){
 function argDetail(id){
  var a=Repo.get('args',id);if(!a)return;
  var S=(a.sourceIds||[]).map(function(i){return Repo.get('sources',i)}).filter(Boolean);
- openSheet(sheetHead(a.title,'<div class="meta">'+stChip(a.status)+(a.topic?'<span class="chip">'+esc(a.topic)+'</span>':'')+'</div>')+
+ openSheet(sheetHead(a.title,'<div class="meta">'+stChip(a.status)+kiChip(a)+(a.topic?'<span class="chip">'+esc(a.topic)+'</span>':'')+'</div>')+kiNote(a)+
  '<div class="cols"><div class="pane pro"><small>Behauptung</small><span class="body">'+esc(a.claim||'–')+'</span></div><div class="pane con"><small>Gegenargument</small><span class="body">'+esc(a.counter||'–')+'</span></div></div>'+
  '<div class="sec"><h2>Quellen</h2>'+(S.length?S.map(function(s){return '<button class="row" data-act="open-source" data-id="'+esc(s.id)+'"><div><b>'+esc(s.title)+'</b><small>'+esc(s.publisher||'')+'</small></div></button>'}).join(''):'<p class="note">Keine Quelle verknüpft.</p>')+'</div>'+
  linkSection('args',id)+relatedSection('args',id)+delNote('args',id)+'<div class="btns"><button class="btn" data-act="edit-arg" data-id="'+esc(id)+'">'+ic('edit',18)+'Bearbeiten</button><button class="btn" data-act="copyx" data-k="args" data-id="'+esc(id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn danger" data-act="del-arg" data-id="'+esc(id)+'">'+ic('trash',18)+'Löschen</button></div>')}
@@ -812,14 +812,14 @@ function splitShared(){var t=$('#p-text'),u=$('#p-url');if(!t||!u||u.value.trim(
 
 /* ---------- Karten ---------- */
 function entryCard(e,why){
- return '<article class="card" role="button" tabindex="0" data-act="open-entry" data-id="'+esc(e.id)+'"><div class="meta"><span class="chip">'+esc(TYPES[e.type]||e.type)+'</span>'+stChip(e.status)+'</div><h3>'+esc(e.title)+'</h3>'+((e.description||e.claimCore)?'<p class="clamp">'+esc(e.description||e.claimCore)+'</p>':'')+
+ return '<article class="card" role="button" tabindex="0" data-act="open-entry" data-id="'+esc(e.id)+'"><div class="meta"><span class="chip">'+esc(TYPES[e.type]||e.type)+'</span>'+stChip(e.status)+kiChip(e)+'</div><h3>'+esc(e.title)+'</h3>'+((e.description||e.claimCore)?'<p class="clamp">'+esc(e.description||e.claimCore)+'</p>':'')+
  whyLine(why)+'<div class="foot">'+linkBadge('entries',e.id)+(e.topic?'<span>'+esc(e.topic)+'</span>':'')+(e.tags||[]).slice(0,3).map(function(t){return '<span class="chip tag">'+esc(t)+'</span>'}).join('')+'</div></article>'}
 function argCard(a,why){
- return '<article class="card" role="button" tabindex="0" data-act="open-arg" data-id="'+esc(a.id)+'"><div class="meta">'+stChip(a.status)+(a.topic?'<span class="chip">'+esc(a.topic)+'</span>':'')+'</div><h3>'+esc(a.title)+'</h3>'+
+ return '<article class="card" role="button" tabindex="0" data-act="open-arg" data-id="'+esc(a.id)+'"><div class="meta">'+stChip(a.status)+kiChip(a)+(a.topic?'<span class="chip">'+esc(a.topic)+'</span>':'')+'</div><h3>'+esc(a.title)+'</h3>'+
  '<div class="cols"><div class="pane pro"><small>Behauptung</small><span class="clamp" style="-webkit-line-clamp:2">'+esc(a.claim)+'</span></div><div class="pane con"><small>Gegenargument</small><span class="clamp" style="-webkit-line-clamp:3">'+esc(a.counter)+'</span></div></div>'+whyLine(why)+(linksOf('args',a.id).length?'<div class="foot">'+linkBadge('args',a.id)+'</div>':'')+'</article>'}
 function srcCard(s,why){
  var n=citedBy(s.id).length;
- return '<article class="card" role="button" tabindex="0" data-act="open-source" data-id="'+esc(s.id)+'"><div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+(s.year?'<span class="chip tag">'+esc(s.year)+'</span>':'')+docChip(s)+'</div><h3>'+esc(s.title)+'</h3><p>'+esc(s.publisher||'')+'</p>'+whyLine(why)+'<div class="foot"><span>Zitiert in '+n+(n===1?' Eintrag':' Einträgen')+'</span></div></article>'}
+ return '<article class="card" role="button" tabindex="0" data-act="open-source" data-id="'+esc(s.id)+'"><div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+(s.year?'<span class="chip tag">'+esc(s.year)+'</span>':'')+docChip(s)+kiChip(s)+'</div><h3>'+esc(s.title)+'</h3><p>'+esc(s.publisher||'')+'</p>'+whyLine(why)+'<div class="foot"><span>Zitiert in '+n+(n===1?' Eintrag':' Einträgen')+'</span></div></article>'}
 function empty(t){return '<div class="empty">'+t+'</div>'}
 
 /* ---------- Dashboard ---------- */
@@ -839,7 +839,7 @@ function viewDashboard(){
  var recent=[].concat(E.map(function(o){return {k:'Wissen',a:'open-entry',o:o,t:o.created}}),S.map(function(o){return {k:'Quelle',a:'open-source',o:o,t:o.created}}),A.map(function(o){return {k:'Argument',a:'open-arg',o:o,t:o.created}})).sort(function(a,b){return b.t-a.t}).slice(0,6);
  var cnt={};E.forEach(function(e){cnt[e.status]=(cnt[e.status]||0)+1});
  var keys=Object.keys(STATUS).filter(function(k){return cnt[k]});
- return inboxCard()+welcomeCard()+installCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
+ return inboxCard()+kiDashCard()+welcomeCard()+installCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
  '<section class="sec"><h2>Neu anlegen</h2><div class="actions"><button class="btn primary" data-act="new-entry">'+ic('plus',18)+'Neuer Eintrag</button><button class="btn" data-act="new-source">'+ic('plus',18)+'Neue Quelle</button><button class="btn" data-act="new-arg">'+ic('plus',18)+'Neue Karte</button><button class="btn" data-act="new-research">'+ic('search',18)+'Neue Recherche</button><button class="btn block" style="grid-column:1/-1" data-act="new-post">'+ic('link',18)+'X-Beitrag erfassen</button></div></section>'+
  '<section class="sec"><div class="sec-h"><h2>Offene Recherchen ('+open.length+')</h2></div>'+(open.length?open.map(function(e){return '<button class="row" data-act="open-entry" data-id="'+esc(e.id)+'"><div><b>'+esc(e.title)+'</b><small>'+esc(TYPES[e.type]||e.type)+(e.topic?' · '+esc(e.topic):'')+'</small></div>'+stChip(e.status)+'</button>'}).join(''):empty('Keine offenen Recherchen. Offene Fragen und Einträge „In Prüfung“ erscheinen hier.'))+'</section>'+
  (recent.length?'<section class="sec"><h2>Zuletzt hinzugefügt</h2>'+recent.map(function(r){return '<button class="row" data-act="'+r.a+'" data-id="'+esc(r.o.id)+'"><span class="kind">'+r.k+'</span><div><b>'+esc(r.o.title)+'</b><small>'+rel(r.t)+'</small></div></button>'}).join('')+'</section>':'')+
@@ -1056,7 +1056,7 @@ function kiSection(){
  * In dieser Etappe wird noch NICHTS gespeichert. */
 var kiImp={text:'',error:'',notes:[],plan:null,choice:null};
 function kiCtx(){return {entries:Repo.all('entries'),args:Repo.all('args'),sources:Repo.all('sources'),sourceKinds:SKINDS}}
-function kiImportOpen(){kiImpSheet();var t=$('#ki-answer');if(t&&!kiImp.plan)t.focus()}
+function kiImportOpen(){if(kiImp.done)kiImp={text:'',error:'',notes:[],plan:null,choice:null};kiImpSheet();var t=$('#ki-answer');if(t&&!kiImp.plan)t.focus()}
 function kiImportCheck(){
  var t=$('#ki-answer');if(t)kiImp.text=t.value;
  var r=KI.parseAnswer(kiImp.text);
@@ -1068,6 +1068,7 @@ function kiLabel(end){
 function kiSrcLabel(r){var P=kiImp.plan,q=P.sources.filter(function(s){return s.ref===r})[0];if(q)return q.title;var o=Repo.get('sources',r);return o?o.title:r}
 function kiImpSheet(){
  var P=kiImp.plan,keep=$('#sheet')&&!$('#overlay').hidden?$('#sheet').scrollTop:0;
+ if(kiImp.done||kiImp.failed){kiDoneSheet();return}
  if(!P){
   openSheet(sheetHead('KI-Antwort einlesen')+
   '<p class="note">Füge hier die Antwort der KI ein (den Datenblock, der mit { beginnt). Text davor oder danach stört nicht. Noch wird nichts gespeichert.</p>'+
@@ -1104,7 +1105,7 @@ function kiImpSheet(){
   '<label class="checkline sub">'+chk('ki-lr',l.i,C.rev[l.i])+' Richtung umdrehen</label>'+
   (card&&KI.FLIPPABLE[l.type]?'<label class="checkline sub">'+chk('ki-lf',l.i,C.flip[l.i])+' Die KI meinte die Behauptung der Gegenseite (Unterstützt/Widerspricht umdrehen)</label>':'')}).join('')+'<p class="note">Lies jede Verknüpfung als Satz. Stimmt die Notiz der KI nicht mit dem Satz überein, hilft oft „Richtung umdrehen“.</p></div>';
   h+='<div class="card"><b>Würde angelegt:</b> '+[pl(F.entries.length,'Eintrag','Einträge'),pl(F.sources.length,'neue Quelle','neue Quellen'),pl(F.cards.length,'Karte','Karten'),pl(F.links.length,'Verknüpfung','Verknüpfungen')].join(' · ')+'<p class="note" style="margin-top:6px">Alles mit Prüfstatus „Neu“ und gekennzeichnet als KI-Vorschlag.</p>'+
- '<button class="btn primary block" disabled>Übernehmen (folgt in der nächsten Version)</button><p class="note">Das Speichern wird in Etappe 3 freigeschaltet. Jetzt kannst du prüfen, ob alles richtig erkannt wird.</p></div>'+
+ '<button class="btn primary block" data-act="ki-apply"'+(kiImp.busy||!(F.entries.length||F.sources.length||F.cards.length||F.links.length)?' disabled':'')+'>'+(kiImp.busy?'Wird gespeichert …':'Übernehmen')+'</button><p class="note">Vorher wird automatisch eine Sicherung angelegt. Vorhandene Einträge werden nicht verändert.</p></div>'+
  '<div class="btns"><button class="btn" data-act="ki-imp-reset">Andere Antwort einfügen</button><button class="btn" data-act="close">Schließen</button></div>';
  openSheet(h);if(keep)$('#sheet').scrollTop=keep}
 function kiImpChange(t){
@@ -1112,6 +1113,47 @@ function kiImpChange(t){
  if(n==='ki-e')C.entries[t.value]=t.checked;else if(n==='ki-k')C.cards[t.value]=t.checked;else if(n==='ki-l')C.links[t.value]=t.checked;else if(n==='ki-lf')C.flip[t.value]=t.checked;else if(n==='ki-lr')C.rev[t.value]=t.checked;else if(n==='ki-s')C.sources[t.dataset.ref]=t.value;else return false;
  kiImpSheet();return true}
 function clip(t,n){t=String(t||'');return t.length>n?t.slice(0,n-1)+'…':t}
+
+/* ---------- KI-Antwort übernehmen (Phase 4B, Etappe 3) ----------
+ * Erst nach Tipp auf „Übernehmen“: Sicherung → alle neuen Datensätze in EINER
+ * Transaktion → neu einlesen und Datensatz für Datensatz vergleichen. */
+function isKi(o){return !!(o&&o.origin&&o.origin.kind==='ki')}
+function kiChip(o){return isKi(o)?'<span class="chip ki-chip" title="Aus einer KI-Antwort übernommen">KI-Vorschlag</span>':''}
+function kiNote(o,isSource){if(!isKi(o))return '';
+ return '<p class="note ki-note">'+(isSource?'Von einer KI genannt, ungeprüft: Titel, Herausgeber und Link bitte selbst prüfen.':'Aus einer KI-Antwort übernommen am '+fmtDate(o.origin.at)+'. Inhalt bitte prüfen und den Prüfstatus anpassen.')+'</p>'}
+function kiDashCard(){
+ var ne=Repo.all('entries').filter(function(o){return isKi(o)&&o.status==='neu'}).length,na=Repo.all('args').filter(function(o){return isKi(o)&&o.status==='neu'}).length,n=ne+na;if(!n)return '';
+ return '<div class="card welcome" id="ki-dash"><h3>'+(n===1?'1 KI-Vorschlag ist':n+' KI-Vorschläge sind')+' noch ungeprüft</h3><p>Aus KI-Antworten übernommen, Prüfstatus „Neu“. Prüfe Inhalt und Quellen und passe den Status an.</p><div class="btns" style="margin-top:12px">'+
+ (ne?'<button class="btn primary" data-act="goto-ki">'+ne+(ne===1?' Eintrag':' Einträge')+'</button>':'')+(na?'<button class="btn'+(ne?'':' primary')+'" data-act="goto-ki-args">'+na+(na===1?' Karte':' Karten')+'</button>':'')+'</div></div>'}
+function kiApply(){
+ if(!kiImp.plan||kiImp.busy)return;
+ var F=KI.finalize(kiImp.plan,kiImp.choice);
+ if(!F.entries.length&&!F.sources.length&&!F.cards.length&&!F.links.length){toast('Nichts ausgewählt');return}
+ var R=KI.toRecords(F,{uid:uid,task:kiImp.plan.task,existingLinks:Repo.all('links')});
+ kiImp.busy=true;kiImpSheet();
+ Repo.addBackup('Vor Übernahme einer KI-Antwort').then(function(){
+  return Repo.bulkPut({entries:R.entries,sources:R.sources,args:R.args,links:R.links})
+ }).then(function(){return DB.readAll()}).then(function(st){
+  var ok=0,total=0,bad=[];
+  [['entries',R.entries],['sources',R.sources],['args',R.args],['links',R.links]].forEach(function(p){var idx={};(st[p[0]]||[]).forEach(function(x){idx[x.id]=x});
+   p[1].forEach(function(r){total++;if(idx[r.id]&&Migrate.stable(idx[r.id])===Migrate.stable(r))ok++;else bad.push(r.title||r.id)})});
+  kiImp.done={R:R,ok:ok,total:total,bad:bad};
+  return Repo.setMeta('kiLog',kiLog().concat([{at:Date.now(),task:'import',chars:0,entries:R.entries.length,args:R.args.length,sources:R.sources.length,links:R.links.length}]).slice(-50))
+ }).catch(function(e){kiImp.failed=e&&e.message?e.message:String(e)}).then(function(){kiImp.busy=false;render();kiImpSheet()})}
+function kiDoneSheet(){
+ if(kiImp.failed){openSheet(sheetHead('KI-Antwort nicht übernommen')+'<div class="card alert"><p><b>Es wurde nichts gespeichert.</b> '+esc(kiImp.failed)+'</p></div><div class="btns"><button class="btn" data-act="close">Schließen</button></div>');kiImp.failed=null;return}
+ var d=kiImp.done,R=d.R,pl=function(n,a,b){return n+' '+(n===1?a:b)};
+ var row=function(act,o,sub){return '<button class="row" data-act="'+act+'" data-id="'+esc(o.id)+'"><div><b>'+esc(o.title)+'</b><small>'+sub+'</small></div><span class="chip ki-chip">KI-Vorschlag</span></button>'};
+ openSheet(sheetHead('KI-Antwort übernommen')+
+ '<div class="card"><p style="color:var(--fg);margin:0"><b>Angelegt:</b> '+[pl(R.entries.length,'Eintrag','Einträge'),pl(R.sources.length,'Quelle','Quellen'),pl(R.args.length,'Karte','Karten'),pl(R.links.length,'Verknüpfung','Verknüpfungen')].join(' · ')+'</p>'+
+ '<p class="note" style="margin-top:6px">Nachkontrolle: '+d.ok+' von '+d.total+' Datensätzen gespeichert und unverändert gelesen'+(d.ok===d.total?' ✓':'')+'.</p>'+
+ (d.bad.length?'<p class="err">Abweichungen bei: '+esc(d.bad.join(', '))+'. Bitte Optionen → Automatische Sicherungen nutzen.</p>':'')+
+ (R.skippedLinks?'<p class="note">'+pl(R.skippedLinks,'Verknüpfung gab','Verknüpfungen gab')+' es schon; nicht doppelt angelegt.</p>':'')+
+ '<p class="note">Alles hat den Prüfstatus „Neu“ und ist als KI-Vorschlag gekennzeichnet. Den Stand vorher findest du unter Optionen → Automatische Sicherungen.</p></div>'+
+ (R.entries.length?'<div class="sec"><h2>Einträge</h2>'+R.entries.map(function(e){return row('open-entry',e,esc(TYPES[e.type]||e.type))}).join('')+'</div>':'')+
+ (R.args.length?'<div class="sec"><h2>Argumentationskarten</h2>'+R.args.map(function(a){return row('open-arg',a,'Argumentationskarte')}).join('')+'</div>':'')+
+ (R.sources.length?'<div class="sec"><h2>Quellen</h2>'+R.sources.map(function(s){return row('open-source',s,esc(s.kind))}).join('')+'</div>':'')+
+ '<div class="btns"><button class="btn" data-act="ki-imp-reset">Weitere KI-Antwort einfügen</button><button class="btn primary" data-act="close">Fertig</button></div>')}
 
 /* ---------- Diskussionsmodus ---------- */
 function viewDisc(){
@@ -1201,6 +1243,9 @@ document.addEventListener('click',function(ev){
   case 'ki-imp-open':kiImportOpen();break;
   case 'ki-imp-check':kiImportCheck();break;
   case 'ki-imp-reset':kiImp={text:'',error:'',notes:[],plan:null,choice:null};kiImpSheet();break;
+  case 'ki-apply':kiApply();break;
+  case 'goto-ki-args':ui.aq='KI-Vorschlag';if(location.hash==='#argumente')render();else location.hash='argumente';break;
+  case 'goto-ki':ui.q='KI-Vorschlag';ui.type=ui.topic=ui.status='';if(location.hash==='#wissen')render();else location.hash='wissen';break;
   case 'ki-ans-copy':if(kiImp.plan&&kiImp.plan.answer)copy(kiImp.plan.answer,'Antworttext kopiert');break;
   case 'ki-toggle':Repo.setSetting('ki',v==='an').then(function(){render();toast(v==='an'?'KI-Erweiterung eingeschaltet':'KI-Erweiterung ausgeschaltet')});break;
   case 'ki-log-clear':if(armed(b,'Wirklich löschen?'))Repo.setMeta('kiLog',[]).then(function(){render();toast('Protokoll gelöscht')});break;

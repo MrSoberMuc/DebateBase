@@ -238,3 +238,7 @@ details.eval summary{cursor:pointer;padding:2px 0}
 .claims-ki{margin:8px 0 0;padding-left:18px}
 .claims-ki li{margin:6px 0}
 .claims-ki small{display:block;color:var(--muted);font-size:.8125rem}
+
+/* Phase 4B, Etappe 3: Kennzeichnung KI-Vorschlag */
+.chip.ki-chip{background:transparent;border:1px dashed var(--accent);color:var(--accent)}
+.ki-note{margin:0 0 4px;padding:6px 10px;border-left:3px dashed var(--accent)}

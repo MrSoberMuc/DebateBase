@@ -35,7 +35,7 @@ await test('„KI-Antwort einfügen“ nur bei eingeschalteter Erweiterung, an a
   await ctx.close();
 });
 
-await test('Vorschau: Zählung, Hinweise, Dubletten, Status „Neu“, Speichern noch gesperrt, Daten unverändert', async () => {
+await test('Vorschau: Zählung, Hinweise, Dubletten, Status „Neu“, Daten bis zum Übernehmen unverändert', async () => {
   const { ctx, page } = await withSample();
   await kiOn(page);
   const before = await dump(page);
@@ -49,7 +49,8 @@ await test('Vorschau: Zählung, Hinweise, Dubletten, Status „Neu“, Speichern
   assert(t.includes('Status: Neu') && t.includes('Von der KI genannt, ungeprüft'), 'Kennzeichnung');
   assert(!(await page.locator('#ki-eval').getAttribute('open') !== null), 'Einschätzung zugeklappt');
   assert((await footer(page)).includes('3 Einträge · 2 neue Quellen · 1 Karte · 3 Verknüpfungen'), await footer(page));
-  assert(await page.isDisabled('#sheet button:has-text("Übernehmen")'), 'Übernehmen gesperrt');
+  /* Ab Etappe 3 ist „Übernehmen“ freigeschaltet; gespeichert wird erst beim Tippen */
+  assert(await page.isEnabled('[data-act=ki-apply]'), 'Übernehmen verfügbar');
   assert(await dump(page) === before, 'Daten verändert');
   assert(page.errors.length === 0, page.errors.join('; '));
   await ctx.close();

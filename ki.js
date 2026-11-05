@@ -182,7 +182,7 @@
     (ctx.entries || []).forEach(function (o) { ex.entries[o.id] = o; });
     (ctx.args || []).forEach(function (o) { ex.args[o.id] = o; });
     (ctx.sources || []).forEach(function (o) { ex.sources[o.id] = o; });
-    var kinds = ctx.sourceKinds || [], refs = {}, plan = { summary: str(data.zusammenfassung, 3000), answer: str(data.antwort, 6000), claims: [], entries: [], sources: [], cards: [], links: [], warnings: W };
+    var kinds = ctx.sourceKinds || [], refs = {}, plan = { task: str(data.aufgabe, 20), summary: str(data.zusammenfassung, 3000), answer: str(data.antwort, 6000), claims: [], entries: [], sources: [], cards: [], links: [], warnings: W };
     var take = function (arr, max, label) { arr = list(arr); if (arr.length > max) { W.push(arr.length + ' ' + label + ' geliefert, nur die ersten ' + max + ' werden berücksichtigt.'); arr = arr.slice(0, max); } return arr; };
     var refOk = function (r, prefix, label, i) {
       r = str(r, 40).trim();
@@ -300,6 +300,44 @@
     return out;
   }
 
+  /* =====================================================================
+   * Etappe 3: Aus der Auswahl fertige Datensätze für DebateBase erzeugen.
+   * Alles bekommt Prüfstatus „neu“ und die Herkunft origin = { kind:'ki' }.
+   * Es entstehen nur NEUE Datensätze; vorhandene werden nie verändert.
+   * opts = { now, uid(prefix), task, existingLinks:[{type,fromK,fromId,toK,toId}] }
+   * ===================================================================== */
+  function toRecords(F, opts) {
+    var now = opts.now || Date.now(), uid = opts.uid, map = {}, origin = function (ref) { return { kind: 'ki', at: now, task: opts.task || '', ref: ref }; };
+    var out = { entries: [], sources: [], args: [], links: [], skippedLinks: 0 };
+    F.sources.forEach(function (s) { map['s:' + s.ref] = uid('s'); });
+    F.entries.forEach(function (e) { map['e:' + e.ref] = uid('e'); });
+    F.cards.forEach(function (k) { map['a:' + k.ref] = uid('a'); });
+    var srcIds = function (targets) { return (targets || []).map(function (t) { return t.isNew ? map['s:' + t.ref] : t.id; }).filter(Boolean); };
+    var endId = function (end) { return end.isNew ? map[(end.kind === 'args' ? 'a:' : 'e:') + end.id] : end.id; };
+    F.sources.forEach(function (s) {
+      out.sources.push({ id: map['s:' + s.ref], title: s.title, publisher: s.publisher || '', author: s.author || '', year: s.year || '', date: '', kind: s.kind || 'Sonstiges', url: s.url || '', note: '',
+        method: '', keyClaims: s.keyClaims || '', limitations: '', coi: '', conflicts: '', created: now, origin: origin(s.ref) });
+    });
+    F.entries.forEach(function (e) {
+      out.entries.push({ id: map['e:' + e.ref], title: e.title, description: e.description || '', type: e.type, status: 'neu', topic: e.topic || '', tags: (e.tags || []).slice(), sourceIds: srcIds(e.sourceTargets), postId: '',
+        claimCore: e.claimCore || '', reason: '', evidence: '', limits: '', conclusion: '', created: now, updated: now, origin: origin(e.ref) });
+    });
+    F.cards.forEach(function (k) {
+      out.args.push({ id: map['a:' + k.ref], title: k.title, claim: k.claim || '', counter: k.counter || '', topic: k.topic || '', status: 'neu', sourceIds: srcIds(k.sourceTargets), created: now, origin: origin(k.ref) });
+    });
+    var have = {};
+    (opts.existingLinks || []).forEach(function (l) { have[l.type + '|' + l.fromK + ':' + l.fromId + '|' + l.toK + ':' + l.toId] = 1; });
+    F.links.forEach(function (l) {
+      var fid = endId(l.from), tid = endId(l.to);
+      if (!fid || !tid) { out.skippedLinks++; return; }
+      var key = l.type + '|' + l.from.kind + ':' + fid + '|' + l.to.kind + ':' + tid;
+      if (have[key]) { out.skippedLinks++; return; }
+      have[key] = 1;
+      out.links.push({ id: uid('l'), type: l.type, fromK: l.from.kind, fromId: fid, toK: l.to.kind, toId: tid, note: l.note || '', created: now, origin: origin('') });
+    });
+    return out;
+  }
+
   global.KI = {
     FORMAT: FORMAT,
     FORMAT_VERSION: FORMAT_VERSION,
@@ -311,6 +349,7 @@
     defaultChoice: defaultChoice,
     finalize: finalize,
     LIMITS: LIMITS,
-    FLIPPABLE: FLIPPABLE
+    FLIPPABLE: FLIPPABLE,
+    toRecords: toRecords
   };
 })(typeof self !== 'undefined' ? self : this);

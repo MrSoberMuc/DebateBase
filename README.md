@@ -118,7 +118,9 @@ Die KI antwortet mit einem Datenblock. Ab Version 3.7.0 fügst du ihn über **KI
 - Die **Vorschau** zeigt die Einschätzung der KI (ungeprüft, wird nicht gespeichert), einen Antworttext zum Kopieren und alle vorgeschlagenen Einträge, Quellen, Karten und Verknüpfungen mit Auswahl.
 - **Dubletten** (ähnlicher Titel, gleicher Link) werden erkannt; doppelte Quellen werden standardmäßig mit der vorhandenen verknüpft.
 - Bei Verknüpfungen helfen **„Richtung umdrehen“** und bei Karten **„Die KI meinte die Behauptung der Gegenseite“**, typische KI-Fehler zu korrigieren.
-- Das Übernehmen in die Datenbank folgt in der nächsten Version.
+- **Übernehmen** (ab Version 3.8.0): Vorher wird automatisch eine Sicherung angelegt. Danach wird alles in einem Schritt gespeichert und Datensatz für Datensatz kontrolliert. Es entstehen nur neue Datensätze; vorhandene werden nie verändert.
+- Alles Übernommene hat den Prüfstatus **„Neu“** und ist als **„KI-Vorschlag“** gekennzeichnet. Das Dashboard zeigt, wie viele KI-Vorschläge noch ungeprüft sind; die Suche nach „KI-Vorschlag“ findet sie.
+- Rückgängig machen: Optionen → Automatische Sicherungen → „Vor Übernahme einer KI-Antwort“.
 
 ## 3. X-Beiträge teilen
 
