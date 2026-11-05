@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.1.0';
+var APP_VERSION='3.2.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -31,7 +31,7 @@ function ic(n,s){s=s||20;return '<svg viewBox="0 0 24 24" width="'+s+'" height="
 var TYPES={definition:'Definition',fakt:'Fakt',statistik:'Statistik',studie:'Studie',behauptung:'Behauptung',argument:'Argument',gegenargument:'Gegenargument',meinung:'Meinung',frage:'Offene Frage'};
 var STATUS={neu:'Neu',pruefung:'In Prüfung',belegt:'Belegt',teilweise:'Teilweise belegt',widerlegt:'Widerlegt',umstritten:'Umstritten',veraltet:'Veraltet'};
 var TOPICS=['Geschichte','Internationale Beziehungen','Politik','Wissenschaft','Gesellschaft','Wirtschaft'];
-var SKINDS=['Primärquelle','Studie','Fachartikel','Statistik','Offizielle Seite','Nachrichten','Sonstiges'];
+var SKINDS=['Primärquelle','Studie','Fachartikel','Statistik','Offizielle Seite','Nachrichten','Buch','Rede oder Interview','Social-Media-Beitrag','Sonstiges'];
 
 /* ---------- Beispieldaten (nur auf Wunsch) ---------- */
 function seed(){
@@ -217,7 +217,7 @@ function docFor(k,o){
  var f=function(label,weight,text){return {label:label,weight:weight,text:text==null?'':String(text)}},fields;
  if(k==='entries')fields=[f('Titel',5,o.title),f('Tags',4,(o.tags||[]).join(', ')),f('Kernaussage',3,o.claimCore),f('Themengebiet',3,o.topic),f('Quellen',2,srcText(o.sourceIds)),f('Beschreibung',2,o.description),f('Begründung',1,o.reason),f('Evidenz',1,o.evidence),f('Einschränkungen',1,o.limits),f('Schlussfolgerung',1,o.conclusion),f('Typ und Status',1,(TYPES[o.type]||o.type||'')+' '+(STATUS[o.status]||o.status||'')),f('Verknüpfungen',1,linkText('entries',o.id))];
  else if(k==='args')fields=[f('Titel',5,o.title),f('Behauptung',3,o.claim),f('Themengebiet',3,o.topic),f('Gegenargument',2,o.counter),f('Quellen',2,srcText(o.sourceIds)),f('Status',1,STATUS[o.status]||o.status),f('Verknüpfungen',1,linkText('args',o.id))];
- else if(k==='sources')fields=[f('Titel',5,o.title),f('Herausgeber',3,o.publisher),f('Jahr',2,o.year),f('Art',2,o.kind),f('Notiz',1,o.note)];
+ else if(k==='sources')fields=[f('Titel',5,o.title),f('Herausgeber',3,o.publisher),f('Autor',3,o.author),f('Kernaussagen',2,o.keyClaims),f('Jahr',2,o.year),f('Quellentyp',2,o.kind),f('Methodik',1,o.method),f('Einschränkungen',1,o.limitations),f('Interessenkonflikte',1,o.conflicts),f('Notiz',1,o.note)];
  else fields=[f('Beitragstext',3,o.text),f('Konto',3,o.handle),f('Thema',3,o.topic),f('Notiz',1,o.note),f('Link',1,o.url)];
  return {id:o.id,kind:k,item:o,fields:fields,tags:o.tags||[],sourceIds:o.sourceIds||[],topic:o.topic||''}}
 function smartSearch(k,list,q){return Analyse.search(list.map(function(o){return docFor(k,o)}),q,{synIndex:synIdx()})}
@@ -293,32 +293,84 @@ function entryDetail(id){
  '<div class="sec"><h2>Quellen</h2>'+(S.length?S.map(function(s){return '<button class="row" data-act="open-source" data-id="'+esc(s.id)+'"><div><b>'+esc(s.title)+'</b><small>'+esc(s.publisher||'')+(s.year?', '+esc(s.year):'')+'</small></div></button>'}).join(''):'<p class="note">Keine Quelle verknüpft.</p>')+'</div>'+
  linkSection('entries',id)+relatedSection('entries',id)+delNote('entries',id)+'<div class="btns"><button class="btn" data-act="edit-entry" data-id="'+esc(id)+'">'+ic('edit',18)+'Bearbeiten</button><button class="btn" data-act="copyx" data-k="entries" data-id="'+esc(id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn danger" data-act="del-entry" data-id="'+esc(id)+'">'+ic('trash',18)+'Löschen</button></div>')}
 
-/* ---------- Quelle ---------- */
+/* ---------- Quelle ----------
+ * Phase 4, Etappe 2: strukturierte Quellenbewertung.
+ * Grundsatz: DebateBase ergänzt keine Angaben selbst. Leere Felder werden als
+ * „nicht angegeben“ angezeigt. Alle neuen Felder sind freiwillig. */
+var COI={'':'Nicht geprüft',keine:'Keine bekannt',ja:'Vorhanden'};
+var METHOD_KINDS=['Studie','Statistik','Fachartikel'];
+/* Angaben, die für die Vollständigkeit zählen. Methodik nur bei Studie, Statistik, Fachartikel. */
+function srcChecks(s){
+ var has=function(v){return !!String(v||'').trim()};
+ var L=[['Herausgeber',has(s.publisher)],['Autor',has(s.author)],['Veröffentlichungsdatum',has(s.year)||has(s.date)]];
+ if(METHOD_KINDS.indexOf(s.kind)>=0)L.push(['Methodik',has(s.method)]);
+ L.push(['Kernaussagen',has(s.keyClaims)],['Einschränkungen',has(s.limitations)],['Interessenkonflikte',!!COI[s.coi]&&!!s.coi]);
+ return L}
+function srcDoc(s){var L=srcChecks(s),ok=L.filter(function(x){return x[1]}).length;return {ok:ok,total:L.length,missing:L.filter(function(x){return !x[1]}).map(function(x){return x[0]})}}
+function docChip(s){var d=srcDoc(s);return '<span class="chip tag doc-'+(d.ok===d.total?'voll':d.ok>=Math.ceil(d.total/2)?'teil':'wenig')+'" title="Dokumentierte Angaben">Doku '+d.ok+'/'+d.total+'</span>'}
+function fmtSrcDate(s){
+ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s.date||'');
+ if(m)return new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'});
+ return s.year||''}
+function srcOpts(sel){var a=SKINDS.slice();if(sel&&a.indexOf(sel)<0)a.push(sel);return arrOpts(a,sel)}
 function sourceForm(id){
  var s=id?Repo.get('sources',id):{title:'',publisher:'',year:'',kind:'Studie',url:'',note:''};
+ var ta=function(name,label,ph,val){return '<div class="field"><label for="s-'+name+'">'+label+' (optional)</label><textarea class="sm" id="s-'+name+'" name="'+name+'" placeholder="'+ph+'">'+esc(val)+'</textarea></div>'};
+ var filled=['method','keyClaims','limitations','conflicts','coi'].some(function(k){return String(s[k]||'').trim()});
  openSheet(sheetHead(id?'Quelle bearbeiten':'Neue Quelle')+
  '<form data-form="source" data-id="'+esc(id||'')+'" class="stack" novalidate>'+
  '<div class="field"><label for="s-title">Titel</label><input id="s-title" name="title" required value="'+esc(s.title)+'"></div>'+
- '<div class="field"><label for="s-pub">Autor oder Herausgeber</label><input id="s-pub" name="publisher" value="'+esc(s.publisher)+'"></div>'+
+ '<div class="field"><label for="s-pub">Herausgeber</label><input id="s-pub" name="publisher" value="'+esc(s.publisher)+'" placeholder="z. B. Umweltbundesamt, The Lancet"></div>'+
+ '<div class="field"><label for="s-author">Autor oder Autorin (optional)</label><input id="s-author" name="author" value="'+esc(s.author)+'" placeholder="z. B. Cook, J. et al."></div>'+
  '<div class="two"><div class="field"><label for="s-year">Jahr</label><input id="s-year" name="year" inputmode="numeric" maxlength="4" value="'+esc(s.year)+'"></div>'+
- '<div class="field"><label for="s-kind">Art</label><select id="s-kind" name="kind">'+arrOpts(SKINDS,s.kind)+'</select></div></div>'+
+ '<div class="field"><label for="s-kind">Quellentyp</label><select id="s-kind" name="kind">'+srcOpts(s.kind)+'</select></div></div>'+
+ '<div class="field"><label for="s-date">Genaues Datum (optional)</label><input id="s-date" name="date" type="date" value="'+esc(s.date)+'"></div>'+
  '<div class="field"><label for="s-url">Link</label><input id="s-url" name="url" type="url" inputmode="url" placeholder="https://" value="'+esc(s.url)+'"></div>'+
  '<div class="field"><label for="s-note">Notiz</label><textarea id="s-note" name="note">'+esc(s.note)+'</textarea></div>'+
+ '<details class="card eval"'+(filled?' open':'')+'><summary><b>Quellenbewertung (optional)</b></summary>'+
+ '<p class="note" style="margin:6px 0 10px">Nur eintragen, was die Quelle selbst angibt oder was du geprüft hast. Leer lassen ist besser als raten.</p><div class="stack">'+
+ ta('method','Methodik','Wie wurden die Ergebnisse gewonnen? z. B. Umfrage mit 2.000 Personen, Metaanalyse',s.method)+
+ ta('keyClaims','Kernaussagen','Was sagt die Quelle im Kern? Eine Aussage pro Zeile',s.keyClaims)+
+ ta('limitations','Einschränkungen','Was nennt die Quelle selbst als Grenzen? Was fehlt?',s.limitations)+
+ '<div class="field"><label for="s-coi">Interessenkonflikte</label><select id="s-coi" name="coi">'+opts(COI,s.coi||'')+'</select></div>'+
+ '<div class="field" id="s-conflicts-f"'+(s.coi==='ja'?'':' hidden')+'><label for="s-conflicts">Welche? (z. B. Finanzierung, Auftraggeber)</label><textarea class="sm" id="s-conflicts" name="conflicts">'+esc(s.conflicts)+'</textarea></div>'+
+ '</div></details>'+
  '<p class="err" id="err" hidden></p>'+
  '<div class="btns"><button type="button" class="btn" data-act="close">Abbrechen</button><button type="submit" class="btn primary">Speichern</button></div></form>')}
 function saveSource(f){
- var d=new FormData(f),title=String(d.get('title')).trim(),id=f.dataset.id;
- if(!title){var er=$('#err');er.textContent='Bitte gib einen Titel ein.';er.hidden=false;return}
+ var d=new FormData(f),title=String(d.get('title')).trim(),id=f.dataset.id,er=$('#err');
+ var fail=function(m,el){er.textContent=m;er.hidden=false;if(el)$(el).focus()};
+ if(!title)return fail('Bitte gib einen Titel ein.');
  var url=String(d.get('url')).trim();
- if(url&&!/^https?:\/\//i.test(url)){var er2=$('#err');er2.textContent='Der Link muss mit http:// oder https:// beginnen.';er2.hidden=false;return}
+ if(url&&!/^https?:\/\//i.test(url))return fail('Der Link muss mit http:// oder https:// beginnen.');
+ var year=String(d.get('year')).trim(),date=String(d.get('date')||'').trim(),coi=String(d.get('coi')||''),conflicts=String(d.get('conflicts')||'').trim();
+ if(date&&!/^\d{4}-\d{2}-\d{2}$/.test(date))return fail('Das Datum ist ungültig.','#s-date');
+ if(date&&year&&year!==date.slice(0,4))return fail('Jahr ('+year+') und Datum ('+date.slice(0,4)+') passen nicht zusammen.','#s-year');
+ if(coi==='ja'&&!conflicts)return fail('Bitte beschreibe kurz den Interessenkonflikt oder wähle „Nicht geprüft“.','#s-conflicts');
+ /* Jahr aus dem eingegebenen Datum übernehmen (keine Schätzung) */
+ if(date&&!year)year=date.slice(0,4);
  var old=id?Repo.get('sources',id):null;
- var o=Object.assign({},old||{},{id:id||uid('s'),title:title,publisher:String(d.get('publisher')).trim(),year:String(d.get('year')).trim(),kind:d.get('kind'),url:url,note:String(d.get('note')).trim(),created:old?old.created:Date.now()});
+ var o=Object.assign({},old||{},{id:id||uid('s'),title:title,publisher:String(d.get('publisher')).trim(),author:String(d.get('author')||'').trim(),year:year,date:date,kind:d.get('kind'),url:url,note:String(d.get('note')).trim(),
+  method:String(d.get('method')||'').trim(),keyClaims:String(d.get('keyClaims')||'').trim(),limitations:String(d.get('limitations')||'').trim(),coi:COI[coi]?coi:'',conflicts:coi==='ja'?conflicts:'',created:old?old.created:Date.now()});
  Repo.put('sources',o).then(function(){closeSheet();render();toast(id?'Quelle gespeichert':'Quelle angelegt')})}
 function citedBy(id){return Repo.all('entries').filter(function(e){return (e.sourceIds||[]).indexOf(id)>=0})}
+function citedByArgs(id){return Repo.all('args').filter(function(a){return (a.sourceIds||[]).indexOf(id)>=0})}
+var CLAIM_TYPES=['behauptung','argument','gegenargument','meinung'];
 function sourceDetail(id){
- var s=Repo.get('sources',id);if(!s)return;var C=citedBy(id);
- openSheet(sheetHead(s.title,'<div class="meta"><span class="chip">'+esc(s.kind)+'</span></div>')+
- '<dl><dt>Von</dt><dd>'+esc(s.publisher||'–')+'</dd><dt>Jahr</dt><dd>'+esc(s.year||'–')+'</dd><dt>Link</dt><dd>'+(s.url?'<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">'+esc(s.url)+'</a>':'–')+'</dd><dt>Notiz</dt><dd>'+esc(s.note||'–')+'</dd></dl>'+
+ var s=Repo.get('sources',id);if(!s)return;var C=citedBy(id),CA=citedByArgs(id),D=srcDoc(s);
+ var val=function(v,multi){v=String(v||'').trim();return v?(multi?'<span class="body">'+esc(v)+'</span>':esc(v)):'<span class="na">nicht angegeben</span>'};
+ var claims=C.filter(function(e){return CLAIM_TYPES.indexOf(e.type)>=0});
+ openSheet(sheetHead(s.title,'<div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+docChip(s)+'</div>')+
+ '<dl><dt>Herausgeber</dt><dd>'+val(s.publisher)+'</dd><dt>Autor</dt><dd>'+val(s.author)+'</dd><dt>Veröffentlicht</dt><dd>'+val(fmtSrcDate(s))+'</dd><dt>Link</dt><dd>'+(s.url?'<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">'+esc(s.url)+'</a>':'–')+'</dd><dt>Notiz</dt><dd>'+esc(s.note||'–')+'</dd></dl>'+
+ '<div class="sec" id="src-eval"><h2>Quellenbewertung</h2><dl>'+
+ '<dt>Methodik</dt><dd>'+(METHOD_KINDS.indexOf(s.kind)>=0||String(s.method||'').trim()?val(s.method,1):'<span class="na">für „'+esc(s.kind)+'“ meist nicht nötig</span>')+'</dd>'+
+ '<dt>Kernaussagen</dt><dd>'+val(s.keyClaims,1)+'</dd><dt>Einschränkungen</dt><dd>'+val(s.limitations,1)+'</dd>'+
+ '<dt>Interessenkonflikte</dt><dd>'+(s.coi==='ja'?'<b>Vorhanden:</b> <span class="body">'+esc(s.conflicts)+'</span>':s.coi==='keine'?'Keine bekannt':'<span class="na">nicht geprüft</span>')+'</dd></dl>'+
+ '<p class="note" style="margin-top:8px">'+D.ok+' von '+D.total+' Angaben dokumentiert'+(D.missing.length?'. Fehlt: '+esc(D.missing.join(', '))+'.':'.')+' DebateBase ergänzt keine Angaben selbst.</p></div>'+
+ '<div class="sec" id="src-claims"><h2>Verknüpfte Behauptungen ('+(claims.length+CA.length)+')</h2>'+
+ (claims.length||CA.length?claims.map(function(e){return '<button class="row" data-act="open-entry" data-id="'+esc(e.id)+'"><div><b>'+esc(e.title)+'</b><small>'+esc(TYPES[e.type]||e.type)+'</small></div>'+stChip(e.status)+'</button>'}).join('')+
+  CA.map(function(a){return '<button class="row" data-act="open-arg" data-id="'+esc(a.id)+'"><div><b>'+esc(a.title)+'</b><small>Argumentationskarte</small></div>'+stChip(a.status)+'</button>'}).join('')
+  :'<p class="note">Keine Behauptung, kein Argument und keine Argumentationskarte nennt diese Quelle.</p>')+'</div>'+
  '<div class="sec"><h2>Zitiert in '+C.length+' Einträgen</h2>'+C.map(function(e){return '<button class="row" data-act="open-entry" data-id="'+esc(e.id)+'"><div><b>'+esc(e.title)+'</b></div>'+stChip(e.status)+'</button>'}).join('')+'</div>'+
  (C.length?'<p class="note">Beim Löschen wird die Quelle aus '+C.length+(C.length===1?' Eintrag':' Einträgen')+' entfernt.</p>':'')+'<div class="btns"><button class="btn" data-act="edit-source" data-id="'+esc(id)+'">'+ic('edit',18)+'Bearbeiten</button><button class="btn danger" data-act="del-source" data-id="'+esc(id)+'">'+ic('trash',18)+'Löschen</button></div>')}
 
@@ -767,7 +819,7 @@ function argCard(a,why){
  '<div class="cols"><div class="pane pro"><small>Behauptung</small><span class="clamp" style="-webkit-line-clamp:2">'+esc(a.claim)+'</span></div><div class="pane con"><small>Gegenargument</small><span class="clamp" style="-webkit-line-clamp:3">'+esc(a.counter)+'</span></div></div>'+whyLine(why)+(linksOf('args',a.id).length?'<div class="foot">'+linkBadge('args',a.id)+'</div>':'')+'</article>'}
 function srcCard(s,why){
  var n=citedBy(s.id).length;
- return '<article class="card" role="button" tabindex="0" data-act="open-source" data-id="'+esc(s.id)+'"><div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+(s.year?'<span class="chip tag">'+esc(s.year)+'</span>':'')+'</div><h3>'+esc(s.title)+'</h3><p>'+esc(s.publisher||'')+'</p>'+whyLine(why)+'<div class="foot"><span>Zitiert in '+n+(n===1?' Eintrag':' Einträgen')+'</span></div></article>'}
+ return '<article class="card" role="button" tabindex="0" data-act="open-source" data-id="'+esc(s.id)+'"><div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+(s.year?'<span class="chip tag">'+esc(s.year)+'</span>':'')+docChip(s)+'</div><h3>'+esc(s.title)+'</h3><p>'+esc(s.publisher||'')+'</p>'+whyLine(why)+'<div class="foot"><span>Zitiert in '+n+(n===1?' Eintrag':' Einträgen')+'</span></div></article>'}
 function empty(t){return '<div class="empty">'+t+'</div>'}
 
 /* ---------- Dashboard ---------- */
@@ -934,7 +986,7 @@ document.addEventListener('keydown',function(ev){
 document.addEventListener('input',function(ev){var i=ev.target.id;
  if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}});
 document.addEventListener('change',function(ev){var i=ev.target.id,v=ev.target.value;
- if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}
+ if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}else if(i==='s-coi'){var cf=$('#s-conflicts-f');if(cf)cf.hidden=v!=='ja'}
  else if(i==='mig-file'&&ev.target.files[0]){var fl=ev.target.files[0],r=new FileReader();r.onload=function(){mig.text=String(r.result);mig.fileName=fl.name+' ('+Math.round(fl.size/1024)+' KB)';mig.error='';migRender()};r.onerror=function(){mig.error='Die Datei konnte nicht gelesen werden.';migRender()};r.readAsText(fl)}
  else if(ev.target.name==='mig-mode'){mig.mode=v;migRender(true)}else if(ev.target.name==='mig-conflict'){mig.conflict=v;migRender(true)}});
 document.addEventListener('submit',function(ev){ev.preventDefault();var f=ev.target,k=f.dataset.form;if(k==='entry')saveEntry(f);else if(k==='source')saveSource(f);else if(k==='arg')saveArg(f);else if(k==='link')saveLink(f);else if(k==='post')savePost(f,ev.submitter&&ev.submitter.value)});

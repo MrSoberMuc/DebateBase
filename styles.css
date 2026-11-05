@@ -179,3 +179,10 @@ details.card[data-kind="skipped"] summary b{color:var(--danger)}
 .why .miss{color:var(--st-pruefung)}
 .note.partial{padding:8px 12px;border:1px dashed var(--line);border-radius:12px}
 .lk-rel{--lc:var(--accent)}
+
+/* Phase 4, Etappe 2: Quellenbewertung */
+.na{color:var(--muted);font-style:italic}
+.chip.doc-voll{color:var(--st-belegt);border-color:var(--st-belegt)}
+.chip.doc-teil{color:var(--st-pruefung)}
+.chip.doc-wenig{color:var(--muted)}
+details.eval summary{cursor:pointer;padding:2px 0}

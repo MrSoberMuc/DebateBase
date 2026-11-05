@@ -60,6 +60,14 @@ Treffer im Titel und in den Tags zählen mehr als Treffer in der Beschreibung (S
 
 **Wichtig:** Das ist keine KI. Die App vergleicht Wörter nach festen Regeln und versteht keine Bedeutung. Alles läuft auf dem Gerät.
 
+### Quellenanalyse (ab Version 3.2.0)
+
+Quellen können zusätzlich zu Titel, Herausgeber, Jahr, Art, Link und Notiz strukturiert bewertet werden (alles freiwillig): **Autor**, **genaues Datum**, **Methodik**, **Kernaussagen**, **Einschränkungen** und **Interessenkonflikte** (nicht geprüft / keine bekannt / vorhanden). Neue Quellentypen: Buch, Rede oder Interview, Social-Media-Beitrag.
+
+- **„Doku x/y“** zeigt, wie viele Angaben dokumentiert sind. Die Methodik zählt nur bei Studie, Statistik und Fachartikel.
+- **„Verknüpfte Behauptungen“** listet automatisch alle Behauptungen, Argumente, Meinungen und Argumentationskarten, die die Quelle nennen.
+- DebateBase **ergänzt keine Angaben selbst**. Leere Felder erscheinen als „nicht angegeben“. Nur das Jahr wird aus einem eingegebenen Datum übernommen.
+
 ## 3. X-Beiträge teilen
 
 Voraussetzung: DebateBase ist **installiert**.

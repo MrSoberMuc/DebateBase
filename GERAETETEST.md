@@ -72,6 +72,15 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] H8 Flugmodus: Suche mit Begründungen funktioniert.
 - [ ] H9 Nach dem Update: Anzahl der Einträge, Quellen, Karten und Verknüpfungen wie vorher (Optionen → Datensicherheit).
 
+## I. Phase 4, Etappe 2: Quellenanalyse (ab Version 3.2.0)
+
+- [ ] I1 Quellen: Jede Karte zeigt „Doku x/y“. Eine bestehende Quelle öffnen: Leere Angaben stehen als „nicht angegeben“ bzw. „nicht geprüft“ da, die bisherigen Angaben sind unverändert.
+- [ ] I2 Bestehende Quelle bearbeiten und ohne Änderung speichern: Titel, Herausgeber, Jahr, Art, Link und Notiz sind gleich geblieben.
+- [ ] I3 Neue Quelle: Autor, genaues Datum (Kalender öffnet sich), „Quellenbewertung“ aufklappen, Methodik, Kernaussagen, Einschränkungen ausfüllen, Interessenkonflikte „Vorhanden“ + Beschreibung → Speichern → „Doku 7/7“.
+- [ ] I4 Jahr 2015 und Datum aus 2013 eingeben → Fehlermeldung „passen nicht zusammen“.
+- [ ] I5 Quelle „Retraction of Wakefield …“ öffnen → „Verknüpfte Behauptungen“ zeigt „Impfstoffe verursachen Autismus“ (Widerlegt).
+- [ ] I6 Quellen-Suche nach einem Autor oder einem Wort aus den Kernaussagen findet die Quelle.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.
