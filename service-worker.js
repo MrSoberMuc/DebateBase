@@ -12,7 +12,7 @@
 /* Datenbank-Funktionen, damit geteilte Beiträge sicher zwischengespeichert werden können */
 importScripts('./db.js');
 
-var VERSION = '3.2.0';
+var VERSION = '3.3.0';
 var APP_CACHE = 'debatebase-app-' + VERSION;
 var FONT_CACHE = 'debatebase-fonts-v1';
 var FONT_CSS = 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Schibsted+Grotesk:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&display=swap';

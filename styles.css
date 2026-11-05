@@ -186,3 +186,16 @@ details.card[data-kind="skipped"] summary b{color:var(--danger)}
 .chip.doc-teil{color:var(--st-pruefung)}
 .chip.doc-wenig{color:var(--muted)}
 details.eval summary{cursor:pointer;padding:2px 0}
+
+/* Phase 4, Etappe 3: Behauptung prüfen */
+#dseg{margin-bottom:2px;grid-template-columns:repeat(2,1fr)}
+.hint-rules p{margin:0;font-size:.8125rem}
+.claim{border-left:4px solid var(--cc,var(--line))}
+.card .claim-text{margin:10px 0 6px;color:var(--fg);font-size:1rem}
+.claim .sec{margin-top:12px}
+.feats,.openq{margin:6px 0 0;padding-left:18px;font-size:.8125rem;color:var(--muted)}
+.feats li,.openq li{margin:3px 0;overflow-wrap:anywhere}
+.feats b{color:var(--fg);font-weight:600}
+.openq li{color:var(--fg)}
+.ck-pruefbar{--cc:var(--accent)}.ck-gemischt{--cc:var(--st-pruefung)}.ck-meinung{--cc:var(--st-umstritten)}.ck-frage{--cc:var(--st-neu)}.ck-aussage,.ck-fragment{--cc:var(--muted)}
+.chip.ck-pruefbar,.chip.ck-gemischt,.chip.ck-meinung,.chip.ck-frage,.chip.ck-aussage,.chip.ck-fragment{color:var(--cc);background:transparent;border:1px solid var(--cc)}

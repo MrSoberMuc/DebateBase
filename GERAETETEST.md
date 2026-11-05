@@ -81,6 +81,16 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] I5 Quelle „Retraction of Wakefield …“ öffnen → „Verknüpfte Behauptungen“ zeigt „Impfstoffe verursachen Autismus“ (Widerlegt).
 - [ ] I6 Quellen-Suche nach einem Autor oder einem Wort aus den Kernaussagen findet die Quelle.
 
+## J. Phase 4, Etappe 3: Behauptung prüfen (ab Version 3.3.0)
+
+- [ ] J1 Diskussion: oben Umschalter „Suchen“ / „Behauptung prüfen“. Die Suche funktioniert wie bisher.
+- [ ] J2 „Behauptung prüfen“: Hinweis „Regelbasierte Analyse, keine KI“ ist sichtbar.
+- [ ] J3 Diesen Text einfügen und „Analysieren“: *Die EU hat 28 Mitgliedstaaten, aber das weiß ja keiner. Experten sagen, Sanktionen wirken nie. Ich finde das lächerlich. Warum sagt das niemand?* → 5 Aussagen, jede mit „unsicher“; Aussage 1 zeigt den Eintrag „Die EU hat 28 Mitgliedstaaten“ (Veraltet) und offene Fragen.
+- [ ] J4 Bei einer Aussage „Als Eintrag speichern“ → Formular ist vorbelegt (Typ Behauptung, Status Neu). Erst „Speichern“ legt den Eintrag an.
+- [ ] J5 Gespeicherten X-Beitrag öffnen → „Behauptungen prüfen“ → Analyse erscheint mit „Aus X-Beitrag von @…“. Gespeicherte Behauptung zeigt unter „Herkunft“ den Beitrag.
+- [ ] J6 Einen echten Beitrag aus X teilen, speichern und prüfen lassen. Notieren, was gut und was falsch erkannt wurde.
+- [ ] J7 App ganz schließen und neu öffnen: Die Analyse ist weg (sie wird absichtlich nicht gespeichert), alle Einträge sind da.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

@@ -68,6 +68,19 @@ Quellen können zusätzlich zu Titel, Herausgeber, Jahr, Art, Link und Notiz str
 - **„Verknüpfte Behauptungen“** listet automatisch alle Behauptungen, Argumente, Meinungen und Argumentationskarten, die die Quelle nennen.
 - DebateBase **ergänzt keine Angaben selbst**. Leere Felder erscheinen als „nicht angegeben“. Nur das Jahr wird aus einem eingegebenen Datum übernommen.
 
+### Behauptung prüfen (ab Version 3.3.0)
+
+Im Bereich **Diskussion → Behauptung prüfen** fügst du einen Text oder X-Beitrag ein (oder tippst bei einem gespeicherten X-Beitrag auf **Behauptungen prüfen**). DebateBase
+
+- entfernt Links, Antwort-Erwähnungen, Emojis und Thread-Zähler und merkt sich Hashtags,
+- zerlegt den Text in einzelne Aussagen (auch Teilsätze mit „; “ oder „, aber …“),
+- ordnet jede Aussage nach Regeln ein: *möglicherweise überprüfbare Behauptung*, *Behauptung mit Wertung*, *eher Meinung*, *Frage*, *Einordnung unklar*,
+- nennt die erkannten Merkmale (Zahl, Zeitangabe, Zuschreibung, Ursache und Wirkung, Vergleich, Pauschalaussage, Vorhersage, vage Angabe, Wertung, Verneinung),
+- zeigt passende gespeicherte Einträge und Karten (über gemeinsame Wörter) und
+- listet **offene Fragen** (z. B. „Woher stammt die Zahl?“, „Kein passender Eintrag – noch zu recherchieren“).
+
+Jede Einordnung ist als **unsicher** gekennzeichnet: Es gibt keine KI, die App versteht keine Bedeutung und erkennt keine Ironie. Das Ergebnis wird **nicht gespeichert**. Einzelne Aussagen übernimmst du mit **Als Eintrag speichern** (Formular vorbelegt, Speichern erst nach Bestätigung).
+
 ## 3. X-Beiträge teilen
 
 Voraussetzung: DebateBase ist **installiert**.
