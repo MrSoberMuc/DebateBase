@@ -123,6 +123,19 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] M6 „Antwort entwerfen“ → Einträge vorschlagen → „KI-Auftrag erstellen (Antwort formulieren lassen)“ → in der KI ausprobieren.
 - [ ] M7 Optionen: „Kopierte Aufträge“ zählt mit; „Protokoll löschen“ (zweimal tippen) setzt auf 0.
 
+## N. Phase 4B, Etappe 2: KI-Antwort einlesen (ab Version 3.7.0)
+
+*Die aufgehobene KI-Antwort aus M5 bereithalten. In dieser Version wird noch nichts gespeichert.*
+
+- [ ] N1 Optionen → KI-Erweiterung → **KI-Antwort einfügen** (auch unter „Behauptung prüfen“, „Antwort entwerfen“ und im Prompt-Fenster).
+- [ ] N2 Die aufgehobene Antwort einfügen → **Prüfen** → Vorschau zeigt „Gelesen: …“ mit Einträgen, Quellen, Karten, Verknüpfungen.
+- [ ] N3 „Einschätzung der KI“ aufklappen: Zusammenfassung und Behauptungen sind lesbar.
+- [ ] N4 Dubletten: Gibt es die Quelle schon (z. B. „Charta der Vereinten Nationen“ in den Beispieldaten), steht dort „Vorhanden: …“ und „Vorhandene Quelle verwenden“.
+- [ ] N5 Einen Eintrag abwählen → „Würde angelegt“ ändert sich; zugehörige Verknüpfungen zeigen „Entfällt …“.
+- [ ] N6 Jede Verknüpfung als Satz lesen. Passt die Notiz nicht, „Richtung umdrehen“ bzw. bei Karten „Die KI meinte die Behauptung der Gegenseite“ testen.
+- [ ] N7 Nur einen Teil der Antwort einfügen → verständliche Meldung „abgeschnitten“.
+- [ ] N8 Optionen → Datensicherheit: Anzahl Einträge, Quellen, Karten, Verknüpfungen ist unverändert.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

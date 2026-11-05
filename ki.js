@@ -82,6 +82,8 @@
     L.push('3. Neue Einträge bekommen die Kennungen n1, n2 …, neue Quellen q1, q2 …, neue Argumentationskarten k1, k2 ….');
     L.push('4. Schreibe auf Deutsch. Titel höchstens 120 Zeichen. Kennzeichne Unsicherheit im Text (z. B. „laut …“, „umstritten“).');
     L.push('5. Lege nur an, was für die Diskussion wirklich nützlich ist, höchstens 8 neue Einträge.');
+    L.push('6. Eine Verknüpfung zu einer Argumentationskarte bezieht sich immer auf mein Gegenargument (meine Position): "unterstuetzt" = stützt das Gegenargument, "widerspricht" = spricht gegen das Gegenargument und damit für die Behauptung der Gegenseite.');
+    L.push('7. Quellen können nicht verknüpft werden; nenne sie im Feld "quellen" eines Eintrags oder einer Karte.');
     L.push('');
     L.push('## Antwortformat (wichtig)');
     L.push('Antworte mit genau einem Codeblock im Format JSON. Kein Text davor oder danach. Felder, die du nicht füllen kannst, lässt du weg; leere Listen sind erlaubt.');
@@ -112,11 +114,203 @@
     return x;
   }
 
+  /* =====================================================================
+   * Etappe 2: KI-Antwort einlesen und prüfen
+   * parseAnswer(text)        findet den Datenblock und liest ihn ein
+   * buildPlan(data, ctx)     prüft alles, löst Kennungen auf, findet Dubletten
+   * defaultChoice(plan)      Vorauswahl (Dubletten nicht neu anlegen)
+   * finalize(plan, choice)   was nach der Auswahl tatsächlich angelegt würde
+   * Nichts hiervon speichert etwas.
+   * ===================================================================== */
+  var FLIPPABLE = { unterstuetzt: 'widerspricht', widerspricht: 'unterstuetzt' };
+  var LIMITS = { entries: 20, sources: 20, cards: 10, links: 40, tags: 10 };
+
+  /* Zählt offene Klammern außerhalb von Zeichenketten: > 0 heißt „abgeschnitten“ */
+  function openBraces(t) {
+    var depth = 0, inStr = false, esc = false;
+    for (var i = 0; i < t.length; i++) {
+      var ch = t[i];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true; else if (ch === '{' || ch === '[') depth++; else if (ch === '}' || ch === ']') depth--;
+    }
+    return depth;
+  }
+  function lineOf(text, pos) { return text.slice(0, pos).split('\n').length; }
+  function parseAnswer(text) {
+    var raw = String(text == null ? '' : text).replace(/^﻿/, '');
+    if (!raw.trim()) return { ok: false, error: 'Es wurde nichts eingefügt.' };
+    var fence = /```(?:json|JSON)?[ \t]*\n?([\s\S]*?)```/.exec(raw);
+    var body = fence ? fence[1] : raw;
+    var a = body.indexOf('{'), b = body.lastIndexOf('}');
+    if (a < 0) return { ok: false, error: 'Kein Datenblock gefunden. Die Antwort der KI muss einen Block enthalten, der mit { beginnt.' };
+    if (b < a) return { ok: false, error: 'Der Datenblock ist unvollständig: Die schließende Klammer } fehlt. Wahrscheinlich wurde die Antwort nicht ganz kopiert.' };
+    var js = body.slice(a, b + 1), notes = [];
+    if (fence === null && (body.slice(0, a).trim() || body.slice(b + 1).trim())) notes.push('Text vor oder nach dem Datenblock wurde ignoriert.');
+    var data = null, err = null;
+    try { data = JSON.parse(js); } catch (e) { err = e; }
+    if (!data) {
+      /* kleine Reparaturen: typografische Anführungszeichen als Feldbegrenzer, Komma vor } oder ] */
+      var fixed = js.replace(/,\s*([}\]])/g, '$1').replace(/([{,]\s*)[“”„]([^“”„"]+)[“”„](\s*:)/g, '$1"$2"$3');
+      try { data = JSON.parse(fixed); notes.push('Kleine Formatfehler der KI wurden automatisch korrigiert.'); } catch (e2) { /* bleibt Fehler */ }
+    }
+    if (!data) {
+      var m = /position (\d+)/.exec(err && err.message || ''), where = m ? ' (etwa Zeile ' + lineOf(js, +m[1]) + ')' : '';
+      var cut = /end of (JSON )?input|Unterminated/i.test(err && err.message || '') || openBraces(body.slice(a)) > 0;
+      return { ok: false, error: cut ? 'Der Datenblock ist abgeschnitten' + where + '. Bitte die Antwort vollständig kopieren.' : 'Der Datenblock ist kein gültiges JSON' + where + '. Bitte die KI, die Antwort im vorgegebenen Format zu wiederholen.' };
+    }
+    if (typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: 'Der Datenblock hat nicht das erwartete Format.' };
+    if (data.debatebase !== FORMAT) notes.push('Die Kennung "debatebase": "ki-antwort" fehlt. Der Block wird trotzdem eingelesen.');
+    if (data.version && data.version > FORMAT_VERSION) notes.push('Der Block hat eine neuere Formatversion (' + data.version + '). Unbekannte Felder werden ignoriert.');
+    return { ok: true, data: data, notes: notes };
+  }
+
+  function norm(t) {
+    return String(t == null ? '' : t).toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+  function wordSet(t) { var s = {}; norm(t).split(' ').forEach(function (w) { if (w.length >= 3) s[w] = 1; }); return s; }
+  function jaccard(a, b) { var A = wordSet(a), B = wordSet(b), i = 0, u = 0, k; for (k in A) { u++; if (B[k]) i++; } for (k in B) if (!A[k]) u++; return u ? i / u : 0; }
+  function similarTitle(a, b) { var na = norm(a), nb = norm(b); return !!na && (na === nb || jaccard(a, b) >= 0.8); }
+  function normUrl(u) { return String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[#?].*$/, '').replace(/\/+$/, ''); }
+  function str(v, max) { return typeof v === 'string' || typeof v === 'number' ? clip(String(v), max || 5000) : ''; }
+  function list(v) { return Array.isArray(v) ? v : []; }
+
+  /* ctx = { entries, args, sources (vorhandene Datensätze), sourceKinds, typeLabel } */
+  function buildPlan(data, ctx) {
+    ctx = ctx || {};
+    var W = [], ex = { entries: {}, args: {}, sources: {} };
+    (ctx.entries || []).forEach(function (o) { ex.entries[o.id] = o; });
+    (ctx.args || []).forEach(function (o) { ex.args[o.id] = o; });
+    (ctx.sources || []).forEach(function (o) { ex.sources[o.id] = o; });
+    var kinds = ctx.sourceKinds || [], refs = {}, plan = { summary: str(data.zusammenfassung, 3000), answer: str(data.antwort, 6000), claims: [], entries: [], sources: [], cards: [], links: [], warnings: W };
+    var take = function (arr, max, label) { arr = list(arr); if (arr.length > max) { W.push(arr.length + ' ' + label + ' geliefert, nur die ersten ' + max + ' werden berücksichtigt.'); arr = arr.slice(0, max); } return arr; };
+    var refOk = function (r, prefix, label, i) {
+      r = str(r, 40).trim();
+      if (!r) { r = prefix + '_' + (i + 1); W.push(label + ' ' + (i + 1) + ' hatte keine Kennung; vergeben: ' + r + '.'); }
+      if (refs[r] || ex.entries[r] || ex.args[r] || ex.sources[r]) { W.push('Kennung „' + r + '“ ist doppelt; ' + label + ' ' + (i + 1) + ' wird übersprungen.'); return null; }
+      return r;
+    };
+
+    list(data.behauptungen).slice(0, 30).forEach(function (c) { if (c && str(c.text)) plan.claims.push({ text: str(c.text, 1000), einordnung: str(c.einordnung, 200), bewertung: str(c.bewertung, 60), belege: list(c.belege).map(function (x) { return str(x, 40); }).filter(Boolean) }); });
+
+    take(data.quellen, LIMITS.sources, 'Quellen').forEach(function (q, i) {
+      if (!q || typeof q !== 'object') return;
+      var title = str(q.titel, 300);
+      if (!title) { W.push('Quelle ' + (i + 1) + ' hat keinen Titel und wird übersprungen.'); return; }
+      var r = refOk(q.ref, 'q', 'Quelle', i); if (!r) return;
+      var url = str(q.link, 500).trim();
+      if (url && !/^https?:\/\/[^\s]+\.[^\s]+/i.test(url)) { W.push('Quelle „' + clip(title, 60) + '“: Link „' + clip(url, 40) + '“ ist ungültig und wird weggelassen.'); url = ''; }
+      var year = str(q.jahr, 30).trim(); if (year && !/^\d{4}$/.test(year)) { W.push('Quelle „' + clip(title, 60) + '“: Jahr „' + year + '“ ist ungültig und wird weggelassen.'); year = ''; }
+      var kind = str(q.typ, 60).trim(); if (kinds.length && kinds.indexOf(kind) < 0) { if (kind) W.push('Quelle „' + clip(title, 60) + '“: Typ „' + kind + '“ ist unbekannt, verwendet wird „Sonstiges“.'); kind = 'Sonstiges'; }
+      var dup = null;
+      Object.keys(ex.sources).some(function (id) { var s = ex.sources[id];
+        if (url && s.url && normUrl(url) === normUrl(s.url)) { dup = { id: id, title: s.title, why: 'gleicher Link' }; return true; }
+        if (similarTitle(title, s.title)) { dup = { id: id, title: s.title, why: 'gleicher oder sehr ähnlicher Titel' }; return true; } return false; });
+      refs[r] = { kind: 'sources', isNew: true };
+      plan.sources.push({ ref: r, title: title, publisher: str(q.herausgeber, 300), author: str(q.autor, 300), year: year, kind: kind || 'Sonstiges', url: url, keyClaims: str(q.kernaussagen), dup: dup });
+    });
+
+    var srcRefs = function (arr, owner) {
+      return list(arr).map(function (x) { return str(x, 40).trim(); }).filter(function (x) {
+        if (!x) return false;
+        if (ex.sources[x] || (refs[x] && refs[x].kind === 'sources')) return true;
+        W.push(owner + ': Quelle „' + x + '“ ist unbekannt und wird weggelassen.'); return false;
+      }).filter(function (x, i, a) { return a.indexOf(x) === i; });
+    };
+    var dupEntry = function (title) { var d = null; Object.keys(ex.entries).some(function (id) { if (similarTitle(title, ex.entries[id].title)) { d = { id: id, title: ex.entries[id].title }; return true; } return false; }); return d; };
+
+    take(data.eintraege, LIMITS.entries, 'Einträge').forEach(function (e, i) {
+      if (!e || typeof e !== 'object') return;
+      var title = str(e.titel, 200);
+      if (!title) { W.push('Eintrag ' + (i + 1) + ' hat keinen Titel und wird übersprungen.'); return; }
+      var r = refOk(e.ref, 'n', 'Eintrag', i); if (!r) return;
+      var type = str(e.typ, 40).trim().toLowerCase();
+      if (ENTRY_TYPES.indexOf(type) < 0) { W.push('Eintrag „' + clip(title, 60) + '“: Typ „' + type + '“ ist unbekannt, verwendet wird „behauptung“.'); type = 'behauptung'; }
+      var tags = list(e.tags).map(function (t) { return str(t, 60).replace(/^#/, '').trim(); }).filter(Boolean).filter(function (t, j, a) { return a.map(norm).indexOf(norm(t)) === j; });
+      if (tags.length > LIMITS.tags) { W.push('Eintrag „' + clip(title, 60) + '“: ' + tags.length + ' Tags, nur die ersten ' + LIMITS.tags + ' werden übernommen.'); tags = tags.slice(0, LIMITS.tags); }
+      refs[r] = { kind: 'entries', isNew: true };
+      plan.entries.push({ ref: r, title: title, type: type, claimCore: str(e.kernaussage, 1000), description: str(e.beschreibung), topic: str(e.thema, 120), tags: tags, sources: srcRefs(e.quellen, 'Eintrag „' + clip(title, 40) + '“'), dup: dupEntry(title) });
+    });
+
+    take(data.karten, LIMITS.cards, 'Karten').forEach(function (k, i) {
+      if (!k || typeof k !== 'object') return;
+      var title = str(k.titel, 200);
+      if (!title) { W.push('Karte ' + (i + 1) + ' hat keinen Titel und wird übersprungen.'); return; }
+      var r = refOk(k.ref, 'k', 'Karte', i); if (!r) return;
+      var dup = null; Object.keys(ex.args).some(function (id) { if (similarTitle(title, ex.args[id].title) || (k.behauptung && similarTitle(k.behauptung, ex.args[id].claim))) { dup = { id: id, title: ex.args[id].title }; return true; } return false; });
+      refs[r] = { kind: 'args', isNew: true };
+      plan.cards.push({ ref: r, title: title, claim: str(k.behauptung, 3000), counter: str(k.gegenargument), topic: str(k.thema, 120), sources: srcRefs(k.quellen, 'Karte „' + clip(title, 40) + '“'), dup: dup });
+    });
+
+    var seen = {};
+    take(data.verknuepfungen, LIMITS.links, 'Verknüpfungen').forEach(function (l, i) {
+      if (!l || typeof l !== 'object') return;
+      var from = str(l.von, 40).trim(), to = str(l.zu, 40).trim(), type = str(l.art, 40).trim().toLowerCase().replace('ü', 'ue').replace('unterstützt', 'unterstuetzt');
+      var end = function (x) { if (ex.entries[x]) return { kind: 'entries', id: x, isNew: false }; if (ex.args[x]) return { kind: 'args', id: x, isNew: false }; if (refs[x] && refs[x].kind !== 'sources') return { kind: refs[x].kind, id: x, isNew: true }; return null; };
+      var F = end(from), T = end(to);
+      if (LINK_TYPES.indexOf(type) < 0) { W.push('Verknüpfung ' + (i + 1) + ': Art „' + type + '“ ist unbekannt und wird übersprungen.'); return; }
+      if (!F || !T) { W.push('Verknüpfung ' + (i + 1) + ' (' + from + ' → ' + to + '): ' + ((refs[from] && refs[from].kind === 'sources') || (refs[to] && refs[to].kind === 'sources') || ex.sources[from] || ex.sources[to] ? 'Quellen können nicht verknüpft werden, nur Einträge und Karten' : 'unbekannte Kennung') + '; wird übersprungen.'); return; }
+      if (from === to) { W.push('Verknüpfung ' + (i + 1) + ' verbindet einen Eintrag mit sich selbst und wird übersprungen.'); return; }
+      var key = from + '|' + type + '|' + to; if (seen[key]) return; seen[key] = 1;
+      plan.links.push({ i: plan.links.length, from: F, to: T, type: type, note: str(l.notiz, 300) });
+    });
+    if (!plan.entries.length && !plan.sources.length && !plan.cards.length && !plan.links.length) W.push('Die Antwort enthält nichts, was angelegt werden könnte.');
+    return plan;
+  }
+
+  /* Vorauswahl: Dubletten werden nicht neu angelegt; doppelte Quellen werden mit der vorhandenen verknüpft */
+  function defaultChoice(plan) {
+    var c = { entries: {}, sources: {}, cards: {}, links: {}, flip: {}, rev: {} };
+    plan.entries.forEach(function (e) { c.entries[e.ref] = !e.dup; });
+    plan.sources.forEach(function (s) { c.sources[s.ref] = s.dup ? 'existing' : 'new'; });
+    plan.cards.forEach(function (k) { c.cards[k.ref] = !k.dup; });
+    plan.links.forEach(function (l) { c.links[l.i] = true; });
+    return c;
+  }
+
+  /* Ergebnis nach Auswahl. Quellenverweise zeigen auf vorhandene Kennungen oder neue Quellen.
+     Verknüpfungen fallen weg, wenn ein Ende nicht angelegt wird (mit Begründung). */
+  function finalize(plan, choice) {
+    var srcTarget = {}, out = { entries: [], sources: [], cards: [], links: [], droppedLinks: [] };
+    plan.sources.forEach(function (s) {
+      var ch = choice.sources[s.ref];
+      if (ch === 'new') { out.sources.push(s); srcTarget[s.ref] = { isNew: true, ref: s.ref }; }
+      else if (ch === 'existing' && s.dup) srcTarget[s.ref] = { isNew: false, id: s.dup.id };
+    });
+    var newRefs = {}; plan.sources.forEach(function (s) { newRefs[s.ref] = 1; });
+    /* Neue Quelle → nach Auswahl neu oder vorhandene; sonst ist es bereits eine vorhandene Kennung */
+    var mapSrc = function (arr) {
+      var seen = {}, res = [];
+      arr.forEach(function (r) { var t = newRefs[r] ? srcTarget[r] : { isNew: false, id: r }; if (!t) return; var k = t.isNew ? 'n:' + t.ref : 'e:' + t.id; if (!seen[k]) { seen[k] = 1; res.push(t); } });
+      return res;
+    };
+    plan.entries.forEach(function (e) { if (choice.entries[e.ref]) out.entries.push(Object.assign({}, e, { sourceTargets: mapSrc(e.sources) })); });
+    plan.cards.forEach(function (k) { if (choice.cards[k.ref]) out.cards.push(Object.assign({}, k, { sourceTargets: mapSrc(k.sources) })); });
+    var alive = function (end) { if (!end.isNew) return true; return end.kind === 'entries' ? !!choice.entries[end.id] : !!choice.cards[end.id]; };
+    plan.links.forEach(function (l) {
+      if (!choice.links[l.i]) return;
+      if (!alive(l.from) || !alive(l.to)) { out.droppedLinks.push(l); return; }
+      /* Umdeuten: Die KI meinte die Behauptung der Gegenseite → Unterstützt/Widerspricht tauschen */
+      var x = l;
+      if (choice.flip && choice.flip[l.i] && FLIPPABLE[l.type]) x = Object.assign({}, x, { type: FLIPPABLE[l.type], flipped: true });
+      /* Richtung umdrehen: die KI hat „von“ und „zu“ vertauscht */
+      if (choice.rev && choice.rev[l.i]) x = Object.assign({}, x, { from: l.to, to: l.from, reversed: true });
+      out.links.push(x);
+    });
+    return out;
+  }
+
   global.KI = {
     FORMAT: FORMAT,
     FORMAT_VERSION: FORMAT_VERSION,
     ENTRY_TYPES: ENTRY_TYPES,
     LINK_TYPES: LINK_TYPES,
-    buildPrompt: buildPrompt
+    buildPrompt: buildPrompt,
+    parseAnswer: parseAnswer,
+    buildPlan: buildPlan,
+    defaultChoice: defaultChoice,
+    finalize: finalize,
+    LIMITS: LIMITS,
+    FLIPPABLE: FLIPPABLE
   };
 })(typeof self !== 'undefined' ? self : this);

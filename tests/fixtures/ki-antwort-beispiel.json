@@ -1,0 +1,33 @@
+{
+  "debatebase": "ki-antwort",
+  "version": 1,
+  "aufgabe": "pruefen",
+  "zusammenfassung": "Der Text enthält eine veraltete Zahl zur EU und eine pauschale Aussage zu Sanktionen. Beide lassen sich mit gespeicherten Einträgen einordnen.",
+  "behauptungen": [
+    { "text": "Die EU hat 28 Mitgliedstaaten.", "einordnung": "überprüfbare Tatsachenbehauptung, veraltet", "bewertung": "widerlegt", "belege": ["e8", "q1"] },
+    { "text": "Sanktionen wirken nie.", "einordnung": "Pauschalaussage mit polemischem Unterton", "bewertung": "umstritten", "belege": ["a4"] }
+  ],
+  "eintraege": [
+    { "ref": "n1", "titel": "Brexit: Austritt des Vereinigten Königreichs aus der EU", "typ": "fakt", "kernaussage": "Das Vereinigte Königreich trat am 31. Januar 2020 aus der EU aus.", "beschreibung": "Seitdem hat die EU 27 Mitgliedstaaten.", "thema": "Politik", "tags": ["EU", "Brexit", "eu", "#Großbritannien"], "quellen": ["q1", "s8"] },
+    { "ref": "n2", "titel": "Wirksamkeit von Sanktionen hängt vom Ziel ab", "typ": "argument", "kernaussage": "Sanktionen wirken eher bei begrenzten Zielen als bei Regimewechsel.", "beschreibung": "Studien zeigen gemischte Ergebnisse.", "thema": "Internationale Beziehungen", "tags": ["Sanktionen"], "quellen": ["q9"] },
+    { "ref": "n3", "titel": "Wie oft haben Sanktionen ihr Ziel erreicht?", "typ": "Frage", "kernaussage": "Belastbare Erfolgsquoten sind unklar.", "tags": [] },
+    { "ref": "n4", "titel": "Die EU hat 28 Mitgliedstaaten", "typ": "behauptung", "kernaussage": "Dublette eines vorhandenen Eintrags" }
+  ],
+  "quellen": [
+    { "ref": "q1", "titel": "Austrittsabkommen zwischen der EU und dem Vereinigten Königreich", "herausgeber": "Europäische Union", "jahr": "2020", "typ": "Primärquelle", "link": "https://eur-lex.europa.eu/legal-content/DE/TXT/?uri=CELEX:12020W/TXT" },
+    { "ref": "q2", "titel": "Charta der Vereinten Nationen", "herausgeber": "Vereinte Nationen", "jahr": "1945", "typ": "Primärquelle", "link": "https://www.un.org/en/about-us/un-charter/full-text" },
+    { "ref": "q3", "titel": "Ein Blogbeitrag", "jahr": "letztes Jahr", "typ": "Blog", "link": "keine-url" }
+  ],
+  "karten": [
+    { "ref": "k1", "titel": "Die EU wird immer größer", "behauptung": "Die EU nimmt ständig neue Mitglieder auf.", "gegenargument": "Mit dem Brexit ist die EU 2020 erstmals kleiner geworden.", "thema": "Politik", "quellen": ["q1"] }
+  ],
+  "verknuepfungen": [
+    { "von": "n1", "art": "widerspricht", "zu": "e8", "notiz": "Der Brexit erklärt, warum die Zahl veraltet ist." },
+    { "von": "n1", "art": "widerspricht", "zu": "k1", "notiz": "Die KI meint vermutlich die Behauptung der Gegenseite." },
+    { "von": "n2", "art": "unterstützt", "zu": "a4", "notiz": "Umlaut in der Art" },
+    { "von": "e6", "art": "basiert", "zu": "n9", "notiz": "unbekannte Kennung" },
+    { "von": "n1", "art": "zitiert", "zu": "q1", "notiz": "Quellen kann man nicht verknüpfen" },
+    { "von": "n1", "art": "erklärt", "zu": "e8" },
+    { "von": "n1", "art": "widerspricht", "zu": "e8", "notiz": "doppelt" }
+  ]
+}

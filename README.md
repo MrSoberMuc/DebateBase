@@ -112,7 +112,13 @@ Unter **Optionen → KI-Erweiterung** einschalten (standardmäßig aus). Danach 
 - **Prompt kopieren** legt genau diesen Text in die Zwischenablage. Du fügst ihn selbst in eine KI deiner Wahl ein. **DebateBase sendet nichts ins Internet** und braucht keine Zugangsdaten.
 - Ein Protokoll auf dem Gerät zählt, wann welcher Auftrag kopiert wurde (löschbar).
 
-Die KI antwortet mit einem Datenblock. Das Einlesen dieser Antwort folgt in der nächsten Version.
+Die KI antwortet mit einem Datenblock. Ab Version 3.7.0 fügst du ihn über **KI-Antwort einfügen** wieder ein:
+
+- DebateBase findet den Block (auch mit Text davor oder danach), repariert kleine Formatfehler und meldet verständlich, wenn etwas fehlt oder abgeschnitten ist.
+- Die **Vorschau** zeigt die Einschätzung der KI (ungeprüft, wird nicht gespeichert), einen Antworttext zum Kopieren und alle vorgeschlagenen Einträge, Quellen, Karten und Verknüpfungen mit Auswahl.
+- **Dubletten** (ähnlicher Titel, gleicher Link) werden erkannt; doppelte Quellen werden standardmäßig mit der vorhandenen verknüpft.
+- Bei Verknüpfungen helfen **„Richtung umdrehen“** und bei Karten **„Die KI meinte die Behauptung der Gegenseite“**, typische KI-Fehler zu korrigieren.
+- Das Übernehmen in die Datenbank folgt in der nächsten Version.
 
 ## 3. X-Beiträge teilen
 

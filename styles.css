@@ -221,3 +221,20 @@ details.eval summary{cursor:pointer;padding:2px 0}
 .checkline{display:flex;gap:8px;align-items:center;font-size:.875rem;margin:4px 0}
 #ki-prompt{min-height:220px;font-size:.75rem}
 .ki-btn{border-style:dashed}
+
+/* Phase 4B, Etappe 2: KI-Antwort-Vorschau */
+.kirow{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-top:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.kirow input[type=checkbox]{margin-top:4px;flex:none}
+.kirow>span{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.kirow b{font:600 .9375rem/1.3 var(--f-display);overflow-wrap:anywhere}
+.kirow small{font-size:.8125rem;color:var(--muted);overflow-wrap:anywhere}
+.kirow small.body{color:var(--fg)}
+.kirow .sel{margin-top:6px;width:100%}
+.kirow.off{opacity:.55}
+.kirow .dup{color:var(--st-pruefung)}
+.kirow .url{font-family:var(--f-mono);font-size:.75rem}
+.checkline.sub{margin:4px 0 0 30px;font-size:.8125rem;color:var(--muted)}
+.alert-soft{border-color:var(--st-pruefung)}
+.claims-ki{margin:8px 0 0;padding-left:18px}
+.claims-ki li{margin:6px 0}
+.claims-ki small{display:block;color:var(--muted);font-size:.8125rem}

@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.6.0';
+var APP_VERSION='3.7.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -883,7 +883,7 @@ function viewCheck(){
  var P=Repo.all('posts').filter(function(p){return String(p.text||'').trim()}),cp=ui.cpost&&Repo.get('posts',ui.cpost);
  return '<div class="card hint-rules"><p><b>Regelbasierte Analyse, keine KI.</b> Die App zerlegt den Text an Satzzeichen und sucht nach Schlüsselwörtern und Zahlen. Sie versteht die Bedeutung nicht und erkennt keine Ironie. Alle Einordnungen sind Hinweise.</p></div>'+
  '<div class="field"><label for="ctext">Text oder X-Beitrag</label><textarea id="ctext" placeholder="Text einfügen, z. B. einen X-Beitrag oder Thread">'+esc(ui.ctext)+'</textarea>'+(cp?'<span class="note">Aus X-Beitrag'+(cp.handle?' von @'+esc(cp.handle):'')+'. Gespeicherte Behauptungen werden mit ihm verknüpft.</span>':'')+'</div>'+
- '<div class="btns"><button class="btn" data-act="check-clear">Leeren</button><button class="btn primary" data-act="check-run">Analysieren</button></div>'+
+ '<div class="btns"><button class="btn" data-act="check-clear">Leeren</button><button class="btn primary" data-act="check-run">Analysieren</button></div>'+(kiOn()?'<button class="btn block ki-btn" style="margin-top:8px" data-act="ki-imp-open">'+ic('plus',18)+'KI-Antwort einfügen</button>':'')+
  (P.length?'<details class="card"><summary><b>Gespeicherten X-Beitrag wählen ('+P.length+')</b></summary><div class="stack" style="margin-top:8px">'+P.slice(0,20).map(function(p){return '<button class="row" data-act="check-post" data-id="'+esc(p.id)+'"><div><b>'+esc(postTitle(p))+'</b><small>'+(p.handle?'@'+esc(p.handle)+' · ':'')+rel(p.created)+'</small></div></button>'}).join('')+'</div></details>':'')+
  '<div id="cres" class="stack"></div>'}
 
@@ -950,7 +950,7 @@ function viewReply(){
  '<div class="sec"><div class="sec-h"><h2 id="rselh">Verwendete Einträge</h2>'+(ui.rsel.length?'<button class="link" data-act="reply-clear">Alle entfernen</button>':'')+'</div><div id="rsel" class="stack"></div></div>'+
  '<div class="sec"><h2>Eintrag hinzufügen</h2><label class="search">'+ic('search',18)+'<input id="rq" type="search" placeholder="Einträge und Karten durchsuchen" value="'+esc(ui.rq)+'" autocomplete="off" aria-label="Einträge suchen"></label><div id="radd" class="stack"></div></div>'+
  '<div class="sec"><h2>Stil</h2><div class="seg" id="rstyle">'+Object.keys(Analyse.STYLES).map(function(k){return '<button data-act="reply-style" data-v="'+k+'" aria-pressed="'+(ui.rstyle===k)+'">'+esc(Analyse.STYLES[k].replace(' und ',' & '))+'</button>'}).join('')+'</div></div>'+
- '<div id="rdraft"></div>'+(kiOn()?'<button class="btn block ki-btn" style="margin-top:10px" data-act="ki-start" data-v="antwort">'+ic('copy',18)+'KI-Auftrag erstellen (Antwort formulieren lassen)</button>':'')}
+ '<div id="rdraft"></div>'+(kiOn()?'<button class="btn block ki-btn" style="margin-top:10px" data-act="ki-start" data-v="antwort">'+ic('copy',18)+'KI-Auftrag erstellen (Antwort formulieren lassen)</button>':'')+(kiOn()?'<button class="btn block ki-btn" style="margin-top:8px" data-act="ki-imp-open">'+ic('plus',18)+'KI-Antwort einfügen</button>':'')}
 function paintReply(){
  var sel=$('#rsel');if(!sel)return;
  var items=replyItems();
@@ -1033,7 +1033,7 @@ function kiSheet(){
  (d.hasExtras?'<label class="checkline"><input type="checkbox" id="ki-keep"'+(d.keep?' checked':'')+'> @-Namen und Links aus dem Text mitschicken</label>':'')+
  '<div class="field"><label for="ki-prompt">Vorschau: genau dieser Text wird kopiert</label><textarea class="mono" id="ki-prompt" readonly>'+esc(P.prompt)+'</textarea><span class="note" id="ki-count">'+P.chars.toLocaleString('de-DE')+' Zeichen</span></div>'+
  '<div class="btns"><button class="btn" data-act="close">Abbrechen</button><button class="btn primary" data-act="ki-copy">'+ic('copy',18)+'Prompt kopieren</button></div>'+
- '<p class="note">Bitte die KI, genau im vorgegebenen Format zu antworten. Das Einfügen der Antwort in DebateBase folgt in der nächsten Etappe.</p>')}
+ '<p class="note">Bitte die KI, genau im vorgegebenen Format zu antworten. Ihre Antwort fügst du danach hier ein:</p>'+(kiOn()?'<button class="btn block ki-btn" style="margin-top:8px" data-act="ki-imp-open">'+ic('plus',18)+'KI-Antwort einfügen</button>':''))}
 function kiRefresh(){if(!kiDraft)return;var P=kiPrompt(),t=$('#ki-prompt');if(t){t.value=P.prompt;$('#ki-count').textContent=P.chars.toLocaleString('de-DE')+' Zeichen'}
  var h=document.querySelector('#sheet .sec h2');if(h)h.textContent='Mitgeschickte Einträge ('+kiDraft.keys.filter(function(k){return kiDraft.sel[k]}).length+' von '+kiDraft.keys.length+')'}
 function kiCopy(){
@@ -1046,10 +1046,72 @@ function kiSection(){
  return '<section class="sec" id="sec-ki"><h2>KI-Erweiterung (optional)</h2><div class="card">'+
  '<p style="margin:0 0 8px">Erzeugt einen Prompt, den du selbst in eine KI deiner Wahl kopierst. DebateBase sendet nichts ins Internet und braucht keine Zugangsdaten. Ohne KI funktioniert alles wie bisher.</p>'+
  '<div class="seg" style="grid-template-columns:repeat(2,1fr)">'+[[false,'Aus'],[true,'An']].map(function(p){return '<button data-act="ki-toggle" data-v="'+(p[0]?'an':'aus')+'" aria-pressed="'+(on===p[0])+'">'+p[1]+'</button>'}).join('')+'</div>'+
- (on?'<p class="note" style="margin-top:8px">Die Knöpfe „KI-Auftrag erstellen“ erscheinen unter „Behauptung prüfen“ und „Antwort entwerfen“.</p>':'')+
+ (on?'<p class="note" style="margin-top:8px">Die Knöpfe „KI-Auftrag erstellen“ und „KI-Antwort einfügen“ erscheinen unter „Behauptung prüfen“ und „Antwort entwerfen“.</p>'+(kiOn()?'<button class="btn block ki-btn" style="margin-top:8px" data-act="ki-imp-open">'+ic('plus',18)+'KI-Antwort einfügen</button>':''):'')+
  '<dl style="margin-top:10px"><dt>Kopierte Aufträge</dt><dd id="ki-logcount">'+L.length+'</dd>'+(L.length?'<dt>Zuletzt</dt><dd>'+fmtSaved(L[L.length-1].at)+' ('+(L[L.length-1].task==='pruefen'?'Text prüfen':'Antwort')+', '+L[L.length-1].chars+' Zeichen)</dd>':'')+'</dl>'+
  (L.length?'<button class="btn block" style="margin-top:8px" data-act="ki-log-clear">Protokoll löschen</button>':'')+
  '<p class="note" style="margin-top:8px">Das Protokoll liegt nur auf diesem Gerät und hält fest, wann du welchen Auftrag kopiert hast.</p></div></section>'}
+
+/* ---------- KI-Antwort einlesen und prüfen (Phase 4B, Etappe 2) ----------
+ * Liest den Datenblock der KI, zeigt eine Vorschau mit Auswahl.
+ * In dieser Etappe wird noch NICHTS gespeichert. */
+var kiImp={text:'',error:'',notes:[],plan:null,choice:null};
+function kiCtx(){return {entries:Repo.all('entries'),args:Repo.all('args'),sources:Repo.all('sources'),sourceKinds:SKINDS}}
+function kiImportOpen(){kiImpSheet();var t=$('#ki-answer');if(t&&!kiImp.plan)t.focus()}
+function kiImportCheck(){
+ var t=$('#ki-answer');if(t)kiImp.text=t.value;
+ var r=KI.parseAnswer(kiImp.text);
+ if(!r.ok){kiImp.error=r.error;kiImp.plan=null;kiImpSheet();return}
+ kiImp.error='';kiImp.notes=r.notes;kiImp.plan=KI.buildPlan(r.data,kiCtx());kiImp.choice=KI.defaultChoice(kiImp.plan);kiImpSheet()}
+function kiLabel(end){
+ var P=kiImp.plan;if(!end.isNew){var o=Repo.get(end.kind,end.id);return o?o.title:end.id}
+ var L=end.kind==='args'?P.cards:P.entries,x=L.filter(function(y){return y.ref===end.id})[0];return x?x.title:end.id}
+function kiSrcLabel(r){var P=kiImp.plan,q=P.sources.filter(function(s){return s.ref===r})[0];if(q)return q.title;var o=Repo.get('sources',r);return o?o.title:r}
+function kiImpSheet(){
+ var P=kiImp.plan,keep=$('#sheet')&&!$('#overlay').hidden?$('#sheet').scrollTop:0;
+ if(!P){
+  openSheet(sheetHead('KI-Antwort einlesen')+
+  '<p class="note">Füge hier die Antwort der KI ein (den Datenblock, der mit { beginnt). Text davor oder danach stört nicht. Noch wird nichts gespeichert.</p>'+
+  '<div class="field"><label for="ki-answer">Antwort der KI</label><textarea class="mono" id="ki-answer" spellcheck="false" placeholder="{ &quot;debatebase&quot;: &quot;ki-antwort&quot;, … }">'+esc(kiImp.text)+'</textarea></div>'+
+  (kiImp.error?'<p class="err">'+esc(kiImp.error)+'</p>':'')+
+  '<div class="btns"><button class="btn" data-act="close">Abbrechen</button><button class="btn primary" data-act="ki-imp-check">Prüfen</button></div>');return}
+ var C=kiImp.choice,F=KI.finalize(P,C),W=kiImp.notes.concat(P.warnings);
+ var chk=function(name,val,on){return '<input type="checkbox" name="'+name+'" value="'+esc(String(val))+'"'+(on?' checked':'')+'>'};
+ var h=sheetHead('KI-Antwort: Vorschau','<div class="meta"><span class="chip">KI-Vorschlag</span><span class="chip tag">noch nichts gespeichert</span></div>');
+ var pl=function(n,a,b){return n+' '+(n===1?a:b)};
+ h+='<div class="card"><b>Gelesen:</b> '+[pl(P.entries.length,'Eintrag','Einträge'),pl(P.sources.length,'Quelle','Quellen'),pl(P.cards.length,'Karte','Karten'),pl(P.links.length,'Verknüpfung','Verknüpfungen')].join(' · ')+'</div>';
+ if(W.length)h+='<div class="card alert-soft"><b>Hinweise ('+W.length+')</b><ul class="issues">'+W.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul></div>';
+ if(P.summary||P.claims.length)h+='<details class="card" id="ki-eval"><summary><b>Einschätzung der KI</b> <span class="chip tag">ungeprüft, wird nicht gespeichert</span></summary>'+(P.summary?'<p class="body" style="margin:8px 0 0">'+esc(P.summary)+'</p>':'')+
+  (P.claims.length?'<ul class="claims-ki">'+P.claims.map(function(c){return '<li><span class="body">„'+esc(c.text)+'“</span>'+(c.bewertung?' <span class="chip tag">'+esc(c.bewertung)+'</span>':'')+(c.einordnung?'<small>'+esc(c.einordnung)+'</small>':'')+(c.belege.length?'<small>Belege laut KI: '+esc(c.belege.map(function(b){return kiSrcLabel(b)!==b?kiSrcLabel(b):(Repo.get('entries',b)||Repo.get('args',b)||{title:b}).title}).join('; '))+'</small>':'')+'</li>'}).join('')+'</ul>':'')+'</details>';
+ if(P.answer)h+='<div class="card"><b>Antworttext der KI</b><p class="body" style="margin:8px 0">'+esc(P.answer)+'</p><button class="btn" data-act="ki-ans-copy">'+ic('copy',18)+'Antworttext kopieren</button></div>';
+ if(P.entries.length)h+='<div class="sec"><h2>Neue Wissenseinträge ('+F.entries.length+' von '+P.entries.length+')</h2>'+P.entries.map(function(e){
+  return '<label class="kirow">'+chk('ki-e',e.ref,C.entries[e.ref])+'<span><b>'+esc(e.title)+'</b><small>'+esc(TYPES[e.type]||e.type)+' · Status: Neu'+(e.topic?' · '+esc(e.topic):'')+'</small>'+
+  (e.claimCore?'<small class="body">'+esc(e.claimCore)+'</small>':'')+(e.tags.length?'<small>Tags: '+esc(e.tags.join(', '))+'</small>':'')+(e.sources.length?'<small>Quellen: '+esc(e.sources.map(kiSrcLabel).join('; '))+'</small>':'<small>ohne Quelle</small>')+
+  (e.dup?'<small class="dup">Ähnlich wie vorhandener Eintrag „'+esc(e.dup.title)+'“ – standardmäßig nicht übernommen</small>':'')+'</span></label>'}).join('')+'</div>';
+ if(P.sources.length)h+='<div class="sec"><h2>Quellen ('+P.sources.length+')</h2><p class="note">Von der KI genannt, ungeprüft. DebateBase kann Titel und Links nicht selbst prüfen.</p>'+P.sources.map(function(s){
+  return '<div class="kirow"><span><b>'+esc(s.title)+'</b><small>'+esc([s.publisher,s.author,s.year,s.kind].filter(Boolean).join(' · '))+'</small>'+(s.url?'<small class="url">'+esc(s.url)+'</small>':'')+
+  (s.dup?'<small class="dup">Vorhanden: „'+esc(s.dup.title)+'“ ('+esc(s.dup.why)+')</small>':'')+
+  '<select class="sel" name="ki-s" data-ref="'+esc(s.ref)+'" aria-label="Umgang mit der Quelle">'+(s.dup?'<option value="existing"'+(C.sources[s.ref]==='existing'?' selected':'')+'>Vorhandene Quelle verwenden</option>':'')+'<option value="new"'+(C.sources[s.ref]==='new'?' selected':'')+'>Neu anlegen</option><option value="skip"'+(C.sources[s.ref]==='skip'?' selected':'')+'>Nicht übernehmen</option></select></span></div>'}).join('')+'</div>';
+ if(P.cards.length)h+='<div class="sec"><h2>Neue Argumentationskarten ('+F.cards.length+' von '+P.cards.length+')</h2>'+P.cards.map(function(k){
+  return '<label class="kirow">'+chk('ki-k',k.ref,C.cards[k.ref])+'<span><b>'+esc(k.title)+'</b><small>Status: Neu'+(k.topic?' · '+esc(k.topic):'')+'</small><small class="body"><b>Gegenseite:</b> '+esc(k.claim)+'</small><small class="body"><b>Gegenargument:</b> '+esc(clip(k.counter,300))+'</small>'+
+  (k.sources.length?'<small>Quellen: '+esc(k.sources.map(kiSrcLabel).join('; '))+'</small>':'')+(k.dup?'<small class="dup">Ähnlich wie vorhandene Karte „'+esc(k.dup.title)+'“ – standardmäßig nicht übernommen</small>':'')+'</span></label>'}).join('')+'</div>';
+ if(P.links.length)h+='<div class="sec"><h2>Verknüpfungen ('+F.links.length+' von '+P.links.length+')</h2>'+P.links.map(function(l){
+  var dropped=F.droppedLinks.indexOf(l)>=0,eff=F.links.filter(function(x){return x.i===l.i})[0],type=eff?eff.type:l.type;
+  var A=eff?eff.from:l.from,B=eff?eff.to:l.to,card=A.kind==='args'||B.kind==='args';
+  var txt='„'+kiLabel(A)+'“ '+(LTYPES[type]||[type])[0].toLowerCase()+' „'+kiLabel(B)+'“';
+  return '<label class="kirow'+(dropped?' off':'')+'">'+chk('ki-l',l.i,C.links[l.i])+'<span><b>'+esc(txt)+'</b>'+(l.note?'<small>'+esc(l.note)+'</small>':'')+
+  (card&&KI.FLIPPABLE[l.type]?'<small>Bezieht sich auf das <b>Gegenargument</b> der Karte. '+(eff&&eff.flipped?'Umgedreht.':'')+'</small>':'')+
+  (dropped?'<small class="dup">Entfällt, weil ein beteiligter Eintrag nicht angelegt wird.</small>':'')+'</span></label>'+
+  '<label class="checkline sub">'+chk('ki-lr',l.i,C.rev[l.i])+' Richtung umdrehen</label>'+
+  (card&&KI.FLIPPABLE[l.type]?'<label class="checkline sub">'+chk('ki-lf',l.i,C.flip[l.i])+' Die KI meinte die Behauptung der Gegenseite (Unterstützt/Widerspricht umdrehen)</label>':'')}).join('')+'<p class="note">Lies jede Verknüpfung als Satz. Stimmt die Notiz der KI nicht mit dem Satz überein, hilft oft „Richtung umdrehen“.</p></div>';
+  h+='<div class="card"><b>Würde angelegt:</b> '+[pl(F.entries.length,'Eintrag','Einträge'),pl(F.sources.length,'neue Quelle','neue Quellen'),pl(F.cards.length,'Karte','Karten'),pl(F.links.length,'Verknüpfung','Verknüpfungen')].join(' · ')+'<p class="note" style="margin-top:6px">Alles mit Prüfstatus „Neu“ und gekennzeichnet als KI-Vorschlag.</p>'+
+ '<button class="btn primary block" disabled>Übernehmen (folgt in der nächsten Version)</button><p class="note">Das Speichern wird in Etappe 3 freigeschaltet. Jetzt kannst du prüfen, ob alles richtig erkannt wird.</p></div>'+
+ '<div class="btns"><button class="btn" data-act="ki-imp-reset">Andere Antwort einfügen</button><button class="btn" data-act="close">Schließen</button></div>';
+ openSheet(h);if(keep)$('#sheet').scrollTop=keep}
+function kiImpChange(t){
+ if(!kiImp.plan)return false;var C=kiImp.choice,n=t.name;
+ if(n==='ki-e')C.entries[t.value]=t.checked;else if(n==='ki-k')C.cards[t.value]=t.checked;else if(n==='ki-l')C.links[t.value]=t.checked;else if(n==='ki-lf')C.flip[t.value]=t.checked;else if(n==='ki-lr')C.rev[t.value]=t.checked;else if(n==='ki-s')C.sources[t.dataset.ref]=t.value;else return false;
+ kiImpSheet();return true}
+function clip(t,n){t=String(t||'');return t.length>n?t.slice(0,n-1)+'…':t}
 
 /* ---------- Diskussionsmodus ---------- */
 function viewDisc(){
@@ -1136,6 +1198,10 @@ document.addEventListener('click',function(ev){
   case 'check-reply':replyFromClaim(v);break;
   case 'ki-start':if(v==='antwort'){var rc=$('#rclaim');if(rc)ui.rclaim=rc.value}kiStart(v==='antwort'?'antwort':'pruefen');break;
   case 'ki-copy':kiCopy();break;
+  case 'ki-imp-open':kiImportOpen();break;
+  case 'ki-imp-check':kiImportCheck();break;
+  case 'ki-imp-reset':kiImp={text:'',error:'',notes:[],plan:null,choice:null};kiImpSheet();break;
+  case 'ki-ans-copy':if(kiImp.plan&&kiImp.plan.answer)copy(kiImp.plan.answer,'Antworttext kopiert');break;
   case 'ki-toggle':Repo.setSetting('ki',v==='an').then(function(){render();toast(v==='an'?'KI-Erweiterung eingeschaltet':'KI-Erweiterung ausgeschaltet')});break;
   case 'ki-log-clear':if(armed(b,'Wirklich löschen?'))Repo.setMeta('kiLog',[]).then(function(){render();toast('Protokoll gelöscht')});break;
   case 'check-run':ui.ctext=$('#ctext').value;runCheck();break;
@@ -1182,8 +1248,9 @@ document.addEventListener('keydown',function(ev){
  if(ev.key==='Escape'&&!$('#overlay').hidden){closeSheet();return}
  if((ev.key==='Enter'||ev.key===' ')&&ev.target.getAttribute&&ev.target.getAttribute('role')==='button'){ev.preventDefault();ev.target.click()}});
 document.addEventListener('input',function(ev){var i=ev.target.id;
- if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}else if(i==='ctext'){ui.ctext=ev.target.value}else if(i==='rclaim'){ui.rclaim=ev.target.value;paintDraft()}else if(i==='rq'){ui.rq=ev.target.value;paintReplyAdd()}});
+ if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}else if(i==='ctext'){ui.ctext=ev.target.value}else if(i==='rclaim'){ui.rclaim=ev.target.value;paintDraft()}else if(i==='rq'){ui.rq=ev.target.value;paintReplyAdd()}else if(i==='ki-answer'){kiImp.text=ev.target.value}});
 document.addEventListener('change',function(ev){var i=ev.target.id,v=ev.target.value;
+ if(kiImpChange(ev.target))return;
  if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}else if(i==='s-coi'){var cf=$('#s-conflicts-f');if(cf)cf.hidden=v!=='ja'}
  else if(i==='mig-file'&&ev.target.files[0]){var fl=ev.target.files[0],r=new FileReader();r.onload=function(){mig.text=String(r.result);mig.fileName=fl.name+' ('+Math.round(fl.size/1024)+' KB)';mig.error='';migRender()};r.onerror=function(){mig.error='Die Datei konnte nicht gelesen werden.';migRender()};r.readAsText(fl)}
  else if(ev.target.name==='ki-item'&&kiDraft){kiDraft.sel[v]=ev.target.checked;kiRefresh()}else if(i==='ki-keep'&&kiDraft){kiDraft.keep=ev.target.checked;kiRefresh()}

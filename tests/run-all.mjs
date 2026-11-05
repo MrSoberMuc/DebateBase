@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const files = ['migrate.unit.test.mjs', 'etappe1.test.mjs', 'etappe2.test.mjs', 'etappe3.test.mjs', 'etappe4.test.mjs', 'etappe5.test.mjs', 'analyse.unit.test.mjs', 'phase4-etappe1.test.mjs', 'phase4-etappe2.test.mjs', 'claims.unit.test.mjs', 'phase4-etappe3.test.mjs', 'relate.unit.test.mjs', 'phase4-etappe4.test.mjs', 'reply.unit.test.mjs', 'phase4-etappe5.test.mjs', 'ki.unit.test.mjs', 'phase4b-etappe1.test.mjs'];
+const files = ['migrate.unit.test.mjs', 'etappe1.test.mjs', 'etappe2.test.mjs', 'etappe3.test.mjs', 'etappe4.test.mjs', 'etappe5.test.mjs', 'analyse.unit.test.mjs', 'phase4-etappe1.test.mjs', 'phase4-etappe2.test.mjs', 'claims.unit.test.mjs', 'phase4-etappe3.test.mjs', 'relate.unit.test.mjs', 'phase4-etappe4.test.mjs', 'reply.unit.test.mjs', 'phase4-etappe5.test.mjs', 'ki.unit.test.mjs', 'phase4b-etappe1.test.mjs', 'kiimport.unit.test.mjs', 'phase4b-etappe2.test.mjs'];
 let pass = 0, total = 0, bad = [];
 for (const f of files) {
   const r = spawnSync(process.execPath, [path.join(dir, f)], { encoding: 'utf8', timeout: 600000 });
