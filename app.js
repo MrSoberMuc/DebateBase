@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.0.0-etappe1';
+var APP_VERSION='3.0.0-etappe2';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -141,6 +141,9 @@ var Repo={
   COLS.forEach(function(c){var list=out[c]||[];put[c]=list;list.forEach(function(o){var a=self.db[c],i=a.map(function(x){return x.id}).indexOf(o.id);if(i>=0)a[i]=o;else a.push(o)})});
   return this.commit({put:put},true)},
  setSetting:function(k,v){this.db.settings[k]=v;return this.commit({put:{settings:[{key:k,value:v}]}})},
+ setMeta:function(k,v){this.db.meta[k]=v;return this.commit({put:{meta:[{key:k,value:v}]}})},
+ /* Protokoll aller Importe und Wiederherstellungen (die letzten 50) */
+ logMigration:function(entry){var log=(this.db.meta.migrations||[]).concat([entry]).slice(-50);return this.setMeta('migrations',log)},
  /* Automatische Sicherung vor gefährlichen Vorgängen. Die neuesten 5 bleiben erhalten. */
  addBackup:function(reason){var self=this;
   if(!self.ready)return Promise.resolve(false);
@@ -441,62 +444,120 @@ function postOrigin(e){
  return '<div class="sec"><h2>Herkunft</h2><button class="row" data-act="open-post" data-id="'+esc(p.id)+'"><div><b>X-Beitrag'+(p.handle?' von @'+esc(p.handle):'')+'</b><small>'+esc((p.text||p.url).slice(0,120))+'</small></div></button></div>'}
 
 /* ================= Sicherung, Prüfung, Import ================= */
-function buildExport(){var D=Repo.db;return {app:'DebateBase',version:3,schema:DB.VERSION,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),counts:counts(D),entries:D.entries,sources:D.sources,args:D.args,links:D.links,posts:D.posts}}
-function validateDb(d){
- var errs=[],warns=[],out={entries:[],sources:[],args:[],links:[],posts:[]},names=Object.keys(out);
- if(!d||typeof d!=='object'||Array.isArray(d))return {ok:false,errs:['Die Datei enthält kein DebateBase-Objekt.'],warns:warns,out:out,st:{}};
- if(d.app&&d.app!=='DebateBase')errs.push('Die Datei stammt nicht aus DebateBase („'+d.app+'“).');
- if(!names.some(function(k){return Array.isArray(d[k])}))errs.push('Es wurden keine Listen mit Datensätzen gefunden (entries, sources, args, links, posts).');
- names.forEach(function(k){if(d[k]!=null&&!Array.isArray(d[k]))errs.push('„'+k+'“ muss eine Liste sein.')});
- if(errs.length)return {ok:false,errs:errs,warns:warns,out:out,st:{}};
- var S=function(v){return typeof v==='string'?v:(v==null?'':String(v))},N=function(v){return typeof v==='number'&&isFinite(v)?v:Date.now()},seen={};
- var A=function(v){return Array.isArray(v)?v.filter(function(x){return typeof x==='string'}):[]};
- var base=function(k,o,i){if(!o||typeof o!=='object'||Array.isArray(o)){warns.push(k+' Nr. '+(i+1)+': kein gültiger Datensatz, übersprungen');return false}
-  if(!o.id||typeof o.id!=='string'){warns.push(k+' Nr. '+(i+1)+': ohne ID, übersprungen');return false}
-  if(seen[k+o.id]){warns.push(k+' '+o.id+': doppelte ID, übersprungen');return false}seen[k+o.id]=1;return true};
- d.entries&&d.entries.forEach(function(o,i){if(!base('Eintrag',o,i))return;var t=S(o.title).trim();if(!t){warns.push('Eintrag '+o.id+': ohne Titel, übersprungen');return}
-  var ty=TYPES[o.type]?o.type:'fakt',st=STATUS[o.status]?o.status:'neu';if(ty!==o.type)warns.push('Eintrag „'+t+'“: unbekannter Typ, „Fakt“ gesetzt');if(st!==o.status)warns.push('Eintrag „'+t+'“: unbekannter Prüfstatus, „Neu“ gesetzt');
-  var r={id:o.id,title:t,description:S(o.description),type:ty,status:st,topic:S(o.topic),tags:A(o.tags),sourceIds:A(o.sourceIds),postId:S(o.postId),created:N(o.created),updated:N(o.updated||o.created)};
-  FIELDS.forEach(function(f){r[f[0]]=S(o[f[0]])});out.entries.push(r)});
- d.sources&&d.sources.forEach(function(o,i){if(!base('Quelle',o,i))return;var t=S(o.title).trim();if(!t){warns.push('Quelle '+o.id+': ohne Titel, übersprungen');return}
-  var k=SKINDS.indexOf(o.kind)>=0?o.kind:'Sonstiges',u=S(o.url).trim();if(u&&!/^https?:\/\//i.test(u)){warns.push('Quelle „'+t+'“: ungültiger Link entfernt');u=''}
-  out.sources.push({id:o.id,title:t,publisher:S(o.publisher),year:S(o.year),kind:k,url:u,note:S(o.note),created:N(o.created)})});
- d.args&&d.args.forEach(function(o,i){if(!base('Karte',o,i))return;var t=S(o.title).trim();if(!t){warns.push('Karte '+o.id+': ohne Titel, übersprungen');return}
-  out.args.push({id:o.id,title:t,claim:S(o.claim),counter:S(o.counter),topic:S(o.topic),status:STATUS[o.status]?o.status:'neu',sourceIds:A(o.sourceIds),created:N(o.created)})});
- d.posts&&d.posts.forEach(function(o,i){if(!base('Beitrag',o,i))return;var tx=S(o.text).trim(),u=S(o.url).trim(),x=u?parseXUrl(u):null;
-  if(!tx&&!x){warns.push('Beitrag '+o.id+': weder Text noch gültiger X-Link, übersprungen');return}
-  out.posts.push({id:o.id,url:x?x.url:'',handle:x?x.handle:'',tweetId:x?x.tweetId:'',text:tx,topic:S(o.topic),note:S(o.note),convertedTo:A(o.convertedTo),created:N(o.created)})});
- var ids=function(col,imp){var s={};Repo.all(col).forEach(function(x){s[x.id]=1});imp.forEach(function(x){s[x.id]=1});return s};
- var E=ids('entries',out.entries),Ar=ids('args',out.args),So=ids('sources',out.sources),dropped=0;
- [out.entries,out.args].forEach(function(a){a.forEach(function(x){var n=x.sourceIds.length;x.sourceIds=x.sourceIds.filter(function(s){return So[s]});dropped+=n-x.sourceIds.length})});
- if(dropped)warns.push(dropped+' Quellenverweis(e) ohne vorhandene Quelle entfernt');
- d.links&&d.links.forEach(function(o,i){if(!base('Verknüpfung',o,i))return;
-  var ok=o.type&&LTYPES[o.type]&&(o.fromK==='entries'||o.fromK==='args')&&(o.toK==='entries'||o.toK==='args')&&S(o.fromId)&&S(o.toId);
-  if(!ok){warns.push('Verknüpfung '+o.id+': ungültige Art oder Endpunkte, übersprungen');return}
-  var has=function(k,id){return (k==='entries'?E:Ar)[id]};
-  if(!has(o.fromK,o.fromId)||!has(o.toK,o.toId)){warns.push('Verknüpfung '+o.id+': verweist auf nicht vorhandenen Eintrag, übersprungen');return}
-  if(o.fromK===o.toK&&o.fromId===o.toId){warns.push('Verknüpfung '+o.id+': verbindet einen Eintrag mit sich selbst, übersprungen');return}
-  out.links.push({id:o.id,type:o.type,fromK:o.fromK,fromId:o.fromId,toK:o.toK,toId:o.toId,note:S(o.note),created:N(o.created)})});
- var st={};names.forEach(function(k){var ex={};Repo.all(k).forEach(function(x){ex[x.id]=1});st[k]={neu:0,ueber:0};out[k].forEach(function(x){if(ex[x.id])st[k].ueber++;else st[k].neu++})});
- var total=names.reduce(function(a,k){return a+out[k].length},0);
- if(!total)errs.push('Die Datei enthält keine gültigen Datensätze.');
- return {ok:errs.length===0,errs:errs,warns:warns,out:out,st:st}}
-var pending=null;
-function importPreview(r){
- var L={entries:'Wissenseinträge',sources:'Quellen',args:'Argumentationskarten',links:'Verknüpfungen',posts:'X-Beiträge'};
- var h=sheetHead(r.ok?'Import prüfen':'Import nicht möglich');
- if(r.errs.length)h+='<div class="card"><p class="err">'+r.errs.map(esc).join('<br>')+'</p></div>';
- if(r.ok)h+='<div class="card"><dl>'+Object.keys(L).map(function(k){return '<dt>'+L[k]+'</dt><dd>'+r.out[k].length+' ('+r.st[k].neu+' neu, '+r.st[k].ueber+' überschreiben)</dd>'}).join('')+'</dl></div>';
- if(r.warns.length)h+='<div class="sec"><h2>Hinweise ('+r.warns.length+')</h2><div class="card"><ul style="margin:0;padding-left:18px;font-size:.875rem">'+r.warns.slice(0,8).map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+(r.warns.length>8?'<li>… und '+(r.warns.length-8)+' weitere</li>':'')+'</ul></div></div>';
- h+=r.ok?'<p class="note">Vorhandene Daten mit gleicher ID werden überschrieben, alles andere bleibt erhalten. Vorher wird automatisch eine Sicherung angelegt.</p><div class="btns"><button class="btn" data-act="close">Abbrechen</button><button class="btn primary" data-act="confirm-import">Importieren</button></div>':'<div class="btns"><button class="btn" data-act="close">Schließen</button></div>';
- openSheet(h)}
-function doImport(){
- var raw=$('#imp').value.trim();if(!raw){toast('Bitte zuerst JSON einfügen oder Datei wählen');return}
- var d;try{d=JSON.parse(raw)}catch(e){pending=null;importPreview({ok:false,errs:['Das ist kein gültiges JSON: '+e.message],warns:[],out:{},st:{}});return}
- pending=validateDb(d);importPreview(pending)}
-function applyImport(){
- if(!pending||!pending.ok)return;var r=pending;pending=null;
- Repo.addBackup('Vor Import').then(function(){return Repo.bulkPut(r.out)}).then(function(){closeSheet();render();toast('Import abgeschlossen')})}
+function buildExport(){var D=Repo.db;return {app:'DebateBase',version:3,schema:DB.VERSION,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),counts:counts(D),settings:{theme:D.settings.theme},entries:D.entries,sources:D.sources,args:D.args,links:D.links,posts:D.posts}}
+function pad(n){return (n<10?'0':'')+n}
+function fileStamp(d){d=d||new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())}
+/* Echter Datei-Download: Android legt die Datei im Ordner „Downloads“ ab. */
+function downloadExport(){
+ var data,name='debatebase-sicherung-'+fileStamp()+'.json';
+ try{data=JSON.stringify(buildExport(),null,2)}catch(e){toast('Export fehlgeschlagen: '+e.message,true);return}
+ try{
+  var blob=new Blob([data],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url)},30000);
+ }catch(e){toast('Download nicht möglich: '+e.message+'. Nutze „JSON anzeigen und kopieren“.',true);return}
+ Repo.setMeta('lastExport',Date.now()).then(function(){if(ui.route!=='dashboard'||$('#overlay').hidden)render()},function(){});
+ toast('Datei „'+name+'“ wird gespeichert (Ordner Downloads)');
+ return name}
+function daysSince(ts){return ts?Math.floor((Date.now()-ts)/DAY):null}
+
+/* ================= Migrationsassistent =================
+ * Schritt 1: Daten einfügen oder Datei wählen
+ * Schritt 2: Vorschau mit Prüfergebnis und deinen Entscheidungen
+ * Schritt 3: Ergebnis mit Nachkontrolle */
+var mig=null;
+var KNOWN={types:TYPES,status:STATUS,ltypes:LTYPES};
+function currentData(){var o={};COLS.forEach(function(c){o[c]=Repo.db[c]});return o}
+function migStart(){mig={step:1,text:'',fileName:'',a:null,mode:'merge',conflict:'skip',error:'',result:null,busy:false};migRender()}
+function migRender(keepScroll){
+ var s=$('#sheet'),top=s.scrollTop;
+ if(mig.step===1)openSheet(migStep1());else if(mig.step===2)openSheet(migStep2());else openSheet(migStep3());
+ if(keepScroll)s.scrollTop=top}
+function migStep1(){
+ return sheetHead('Daten übernehmen','<p class="note" style="margin:0">Schritt 1 von 3 · Daten einlesen</p>')+
+ '<div class="card"><p style="color:var(--fg);margin:0 0 6px"><b>So holst du deine Daten aus Version 2:</b></p><ol class="steps">'+
+ '<li>Version 2 in der Claude-App öffnen und unten auf <b>Optionen</b> tippen.</li>'+
+ '<li><b>Vollständigen Export (JSON) anzeigen</b> und dann <b>JSON kopieren</b> tippen.</li>'+
+ '<li>Hierher zurückkehren und den Text unten einfügen (lange auf das Feld tippen → Einfügen).</li></ol>'+
+ '<p class="note" style="margin-top:8px">Bewahre den kopierten Text zusätzlich auf, z. B. per Mail an dich selbst. Version 2 bleibt unverändert, dort wird nichts gelöscht.</p></div>'+
+ '<p class="note">Du kannst hier auch eine Sicherungsdatei von DebateBase 3 (.json) wählen.</p>'+
+ '<div class="field"><label for="mig-text">Exportierter Text</label><textarea class="mono" id="mig-text" placeholder="{&quot;app&quot;:&quot;DebateBase&quot;, …}" spellcheck="false" autocapitalize="off">'+esc(mig.text)+'</textarea></div>'+
+ '<div class="field"><label for="mig-file">Oder Datei wählen</label><input type="file" id="mig-file" accept=".json,application/json,text/plain">'+(mig.fileName?'<span class="note">Geladen: '+esc(mig.fileName)+'</span>':'')+'</div>'+
+ (mig.error?'<div class="card alert"><p class="err">'+esc(mig.error)+'</p></div>':'')+
+ '<p class="note">Beim Prüfen wird noch nichts gespeichert.</p>'+
+ '<div class="btns"><button class="btn" data-act="close">Abbrechen</button><button class="btn primary" data-act="mig-check">Prüfen</button></div>'}
+function migCheck(){
+ var ta=$('#mig-text');if(ta)mig.text=ta.value;
+ var p=Migrate.parse(mig.text);
+ if(!p.ok){mig.error=p.error;migRender();return}
+ var a=Migrate.analyze(p.data,currentData(),KNOWN);
+ if(!a.ok){mig.error=a.errors.join(' ');migRender();return}
+ mig.error='';mig.a=a;mig.mode='merge';mig.conflict='skip';mig.step=2;migRender()}
+function listBlock(title,items,cls){
+ if(!items.length)return '';
+ return '<details class="card"'+(cls?' data-kind="'+cls+'"':'')+'><summary><b>'+esc(title)+' ('+items.length+')</b></summary><ul class="issues">'+items.slice(0,30).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+(items.length>30?'<li>… und '+(items.length-30)+' weitere (siehe „Bericht kopieren“)</li>':'')+'</ul></details>'}
+function migStep2(){
+ var a=mig.a,empty=isEmptyDb(),plan=Migrate.build(a,currentData(),{mode:mig.mode,conflict:mig.conflict});mig.plan=plan;
+ var nConf=a.conflicts.length;
+ var rows=Migrate.COLS.map(function(c){var i=a.cols[c];if(!i.inFile)return '<dt>'+Migrate.LABEL[c]+'</dt><dd>–</dd>';
+  var parts=[i.inFile+' in der Datei'];
+  if(!empty){parts.push(i.neu.length+' neu');if(i.same.length)parts.push(i.same.length+' schon vorhanden');if(i.conflict.length)parts.push('<b>'+i.conflict.length+' Konflikte</b>')}
+  if(i.invalid)parts.push('<span style="color:var(--danger)">'+i.invalid+' übersprungen</span>');
+  return '<dt>'+Migrate.LABEL[c]+'</dt><dd>'+parts.join(' · ')+'</dd>'}).join('');
+ var h=sheetHead('Vorschau','<p class="note" style="margin:0">Schritt 2 von 3 · Noch wurde nichts gespeichert</p>')+
+ '<div class="card"><p style="color:var(--fg);margin:0 0 8px">Erkannt: <b>'+esc(a.format.label)+'</b>'+(a.format.exportedAt?'<br><small style="color:var(--muted)">Exportiert am '+esc(fmtIso(a.format.exportedAt))+'</small>':'')+'</p><dl>'+rows+'</dl></div>'+
+ listBlock('Übersprungene Datensätze',a.skipped,'skipped')+listBlock('Hinweise',a.warnings,'warnings');
+ if(!empty){
+  h+='<div class="sec"><h2>Wie soll importiert werden?</h2><div class="pick">'+
+  radio('mig-mode','merge',mig.mode,'<b>Zusammenführen</b> (empfohlen)<br><small>Deine vorhandenen Daten bleiben erhalten. Neue Datensätze kommen hinzu.</small>')+
+  radio('mig-mode','replace',mig.mode,'<b>Komplett ersetzen</b><br><small>Alle Daten auf diesem Gerät werden durch den Inhalt der Datei ersetzt (Wiederherstellung).</small>')+'</div></div>';
+  if(mig.mode==='merge'&&nConf){
+   h+='<div class="sec"><h2>'+nConf+(nConf===1?' Konflikt':' Konflikte')+'</h2><p class="note">Diese Datensätze gibt es auf dem Gerät schon mit derselben ID, aber mit anderem Inhalt:</p>'+
+   '<ul class="issues">'+a.conflicts.slice(0,5).map(function(k){return '<li>'+esc(Migrate.LABEL[k.col]+': '+(k.existing.title||k.existing.text||k.id))+'</li>'}).join('')+(nConf>5?'<li>… und '+(nConf-5)+' weitere</li>':'')+'</ul>'+
+   '<div class="pick">'+
+   radio('mig-conflict','skip',mig.conflict,'<b>Vorhandene behalten</b> (empfohlen)<br><small>Die Version aus der Datei wird nicht übernommen.</small>')+
+   radio('mig-conflict','replace',mig.conflict,'<b>Durch Datei ersetzen</b><br><small>Die Version auf dem Gerät wird überschrieben.</small>')+
+   radio('mig-conflict','copy',mig.conflict,'<b>Beide behalten</b><br><small>Die Version aus der Datei wird als Kopie mit neuer ID angelegt. Verweise werden angepasst.</small>')+'</div></div>'}
+ }
+ var willDelete=mig.mode==='replace'?counts(Repo.db):null;
+ h+='<div class="card"><p style="color:var(--fg);margin:0"><b>Es werden '+plan.count+' Datensätze gespeichert.</b>'+
+  (willDelete?'<br>Dabei werden die aktuellen '+willDelete.entries+' Einträge, '+willDelete.sources+' Quellen, '+willDelete.args+' Karten, '+willDelete.links+' Verknüpfungen und '+willDelete.posts+' X-Beiträge ersetzt.':'')+'</p>'+
+  '<p class="note" style="margin-top:6px">Vorher wird automatisch eine Sicherung des aktuellen Stands angelegt. Der Import geschieht in einem Schritt: entweder vollständig oder gar nicht.</p></div>';
+ if(mig.mode==='replace')h+='<div class="field"><label for="mig-word">Tippe ERSETZEN, um zu bestätigen</label><input id="mig-word" autocomplete="off" autocapitalize="characters" data-word="ERSETZEN"></div>';
+ h+='<div class="btns"><button class="btn" data-act="mig-copy-report">Bericht kopieren</button></div>'+
+ '<div class="btns"><button class="btn" data-act="mig-back">Zurück</button><button class="btn primary" id="mig-go" data-act="mig-apply"'+(plan.count&&mig.mode!=='replace'?'':' disabled')+'>'+(mig.mode==='replace'?'Ersetzen':'Importieren')+'</button></div>';
+ return h}
+function radio(name,val,cur,label){return '<label><input type="radio" name="'+name+'" value="'+val+'"'+(val===cur?' checked':'')+'><span>'+label+'</span></label>'}
+function fmtIso(s){var d=new Date(s);return isNaN(d)?s:d.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+function migApply(){
+ if(mig.busy)return;var plan=mig.plan;if(!plan||!plan.count)return;
+ mig.busy=true;var go=$('#mig-go');if(go){go.disabled=true;go.textContent='Wird gespeichert …'}
+ var reason=mig.mode==='replace'?'Vor Wiederherstellung aus Datei':'Vor Import';
+ Repo.addBackup(reason).then(function(){
+  return mig.mode==='replace'?Repo.replace(plan.write):Repo.bulkPut(plan.write)
+ }).then(function(){return DB.readAll()}).then(function(stored){
+  var ver=Migrate.verify(plan,stored);
+  mig.result={ok:true,ver:ver};
+  return Repo.logMigration({at:Date.now(),format:mig.a.format.label,mode:plan.mode,conflict:plan.conflict,written:plan.count,verified:ver.ok,problems:ver.problems.length})
+ }).catch(function(e){mig.result={ok:false,error:e&&e.message?e.message:String(e)}}).then(function(){
+  mig.busy=false;mig.step=3;render();migRender()})}
+function migStep3(){
+ var r=mig.result,plan=mig.plan,h;
+ if(!r.ok){
+  return sheetHead('Import nicht durchgeführt','<p class="note" style="margin:0">Schritt 3 von 3</p>')+
+  '<div class="card alert"><p><b>Es wurde nichts geändert.</b> '+esc(r.error)+'</p></div>'+
+  '<p class="note">Deine bisherigen Daten sind unverändert. Du kannst es erneut versuchen oder den Bericht kopieren und mir schicken.</p>'+
+  '<div class="btns"><button class="btn" data-act="mig-copy-report">Bericht kopieren</button><button class="btn primary" data-act="mig-back">Zurück zur Vorschau</button></div>'}
+ var v=r.ver;
+ h=sheetHead(v.ok_all?'Import abgeschlossen':'Import mit Problemen','<p class="note" style="margin:0">Schritt 3 von 3 · Ergebnis</p>')+
+ '<div class="card'+(v.ok_all?' welcome':' alert')+'"><p style="margin:0"><b>Nachkontrolle: '+v.ok+' von '+v.checked+' Datensätzen korrekt gespeichert.</b></p>'+
+ (v.ok_all?'<p class="note" style="margin-top:6px">Alle Datensätze wurden nach dem Speichern neu gelesen und mit der Datei verglichen.</p>':'<ul class="issues">'+v.problems.slice(0,10).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul><p class="note" style="margin-top:6px">Unter Einstellungen → Automatische Sicherungen kannst du den Stand vor dem Import wiederherstellen.</p>')+'</div>'+
+ '<div class="card"><dl>'+Migrate.COLS.map(function(c){var s=plan.summary[c],p=[];if(s.neu)p.push(s.neu+' neu');if(s.ersetzt)p.push(s.ersetzt+' ersetzt');if(s.kopiert)p.push(s.kopiert+' als Kopie');if(s.behalten)p.push(s.behalten+' vorhandene behalten');if(s.gleich)p.push(s.gleich+' schon vorhanden');return '<dt>'+Migrate.LABEL[c]+'</dt><dd>'+(p.join(' · ')||'–')+'</dd>'}).join('')+'</dl>'+
+ (plan.remapped?'<p class="note" style="margin-top:6px">'+plan.remapped+' Verweise wurden auf die neuen IDs umgeschrieben.</p>':'')+'</div>'+
+ '<div class="card"><p style="color:var(--fg);margin:0"><b>Empfehlung:</b> Lade jetzt eine Sicherungsdatei herunter. Das ist deine erste echte Sicherung außerhalb der App.</p><button class="btn primary block" style="margin-top:10px" data-act="download">Sicherungsdatei herunterladen</button></div>'+
+ '<div class="btns"><button class="btn" data-act="mig-copy-report">Bericht kopieren</button><button class="btn" data-act="close">Fertig</button></div>';
+ return h}
+function migReport(){return Migrate.report(mig.a||{format:null,cols:{},errors:[mig.error],warnings:[],skipped:[]},mig.step>=2?mig.plan:null,mig.result&&mig.result.ver)+(mig.result&&!mig.result.ok?'\nFehler beim Speichern: '+mig.result.error:'')}
 function dangerSheet(kind){
  var w=kind==='wipe'?'LÖSCHEN':'ZURÜCKSETZEN',D=Repo.db;
  openSheet(sheetHead(kind==='wipe'?'Alle Daten löschen?':'Auf Beispieldaten zurücksetzen?')+
@@ -528,12 +589,15 @@ function viewSettings(){
  (iss.length?'<p style="color:var(--fg)">'+iss.length+(iss.length===1?' Auffälligkeit':' Auffälligkeiten')+' gefunden. Es wurde nichts verändert.</p><ul class="issues">'+iss.slice(0,10).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+(iss.length>10?'<li>… und '+(iss.length-10)+' weitere</li>':'')+'</ul>':'<p style="color:var(--fg)">Keine Auffälligkeiten. Alle Verweise zeigen auf vorhandene Datensätze.</p>')+'</div></section>'+
  '<section class="sec"><h2>Automatische Sicherungen ('+Repo.backups.length+')</h2>'+
  (Repo.backups.length?Repo.backups.map(function(b){return '<div class="card bk"><div><b>'+fmtSaved(b.at)+'</b><small>'+esc(b.reason)+'</small><small>'+bkCounts(b.counts)+'</small></div><button class="btn" data-act="restore-backup" data-id="'+esc(b.id)+'">Wiederherstellen</button></div>'}).join(''):'<p class="note">Noch keine Sicherung. Vor jedem Import, Zurücksetzen, Löschen und Wiederherstellen wird automatisch eine angelegt (die letzten '+MAX_BACKUPS+' bleiben erhalten).</p>')+'</section>'+
- '<section class="sec"><h2>Export</h2><button class="btn block" data-act="export">Vollständigen Export (JSON) anzeigen</button><textarea class="mono" id="exp" readonly hidden aria-label="Export"></textarea><button class="btn block" id="expCopy" data-act="copy-export" hidden>'+ic('copy',18)+'JSON kopieren</button><p class="note">Der Export enthält Einträge, Quellen, Karten, Verknüpfungen und X-Beiträge. Der Download als Datei folgt in Etappe 2.</p></section>'+
- '<section class="sec" id="sec-import"><h2>Import</h2><textarea class="mono" id="imp" placeholder="JSON hier einfügen" aria-label="Import"></textarea><input type="file" id="impFile" accept=".json,application/json,text/plain" aria-label="JSON-Datei wählen"><button class="btn block" data-act="import">Prüfen und importieren</button><p class="note">Hier kannst du den Export aus Version 2 einfügen. Die Struktur wird geprüft, bevor etwas geändert wird. Ein ausführlicher Migrationsassistent folgt in Etappe 2.</p></section>'+
+ '<section class="sec" id="sec-backup"><h2>Datensicherung</h2><div class="card"><dl><dt>Letzte Sicherungsdatei</dt><dd>'+(D.meta.lastExport?fmtSaved(D.meta.lastExport):'noch nie')+'</dd></dl><button class="btn primary block" style="margin-top:10px" data-act="download">Sicherungsdatei herunterladen</button><p class="note" style="margin-top:8px">Speichert die gesamte Datenbank als JSON-Datei im Ordner „Downloads“. Lege sie zusätzlich an einem sicheren Ort ab, z. B. in Google Drive.</p></div>'+
+ '<button class="btn block" data-act="export">JSON anzeigen und kopieren</button><textarea class="mono" id="exp" readonly hidden aria-label="Export"></textarea><button class="btn block" id="expCopy" data-act="copy-export" hidden>'+ic('copy',18)+'JSON kopieren</button></section>'+
+ '<section class="sec" id="sec-import"><h2>Import und Wiederherstellung</h2><button class="btn block" data-act="open-migration">Daten übernehmen oder Sicherung wiederherstellen</button><p class="note">Für den Export aus Version 2 und für Sicherungsdateien. Du siehst vor dem Speichern eine Vorschau und entscheidest bei Konflikten selbst.</p>'+migLog()+'</section>'+
  '<section class="sec"><h2>X-Beiträge</h2><button class="btn block" data-act="new-post">'+ic('link',18)+'X-Beitrag erfassen</button>'+
  '<div class="card"><div class="meta"><b style="font-family:var(--f-display)">Android-Teilen</b><span class="chip st st-pruefung">Folgt in Etappe 4</span></div><p style="margin-top:8px">Teilen aus der X-App direkt nach DebateBase wird angebunden, sobald die App installierbar ist (Manifest und Service Worker). Bis dahin X-Beiträge bitte über „X-Beitrag erfassen“ einfügen.</p></div></section>'+
  '<section class="sec"><h2>Zurücksetzen</h2><button class="btn block" data-act="reset-sample">Beispieldaten wiederherstellen</button><button class="btn block danger" data-act="wipe">Alle Daten löschen</button></section>'+
  '<p class="note">DebateBase '+esc(APP_VERSION)+'. Installation, Offline-Betrieb und Teilen folgen in den nächsten Etappen. Beispieldaten dienen nur zur Demonstration, bitte Fakten vor der Verwendung selbst prüfen.</p>'}
+function migLog(){var L=(Repo.db.meta.migrations||[]).slice(-3).reverse();if(!L.length)return '';
+ return '<div class="card"><p style="color:var(--fg);margin:0 0 4px"><b>Letzte Importe</b></p><ul class="issues">'+L.map(function(m){return '<li>'+fmtSaved(m.at)+': '+esc(m.format)+', '+(m.mode==='replace'?'ersetzt':'zusammengeführt')+', '+m.written+' Datensätze, Nachkontrolle '+m.verified+'/'+m.written+(m.problems?' – '+m.problems+' Probleme':' ✓')+'</li>'}).join('')+'</ul></div>'}
 function paintUsage(){var el=$('#usage');if(!el)return;DB.estimate().then(function(e){if(!el.isConnected)return;el.textContent=e&&e.usage!=null?(e.usage/1048576).toFixed(2).replace('.',',')+' MB':'Unbekannt'})}
 
 /* ================= Zusätzliche Ereignisse ================= */
@@ -542,7 +606,9 @@ document.addEventListener('change',function(ev){var i=ev.target.id;
  else if(i==='lk-type'||i==='lk-dir'||i==='lk-partner')updateLinkPreview();
  else if(i==='p-text')splitShared()});
 document.addEventListener('paste',function(ev){if(ev.target.id==='p-text')setTimeout(splitShared,0)});
-document.addEventListener('input',function(ev){if(ev.target.id==='dg-word'){$('#dg-go').disabled=ev.target.value.trim().toUpperCase()!==ev.target.dataset.word}});
+document.addEventListener('input',function(ev){if(ev.target.id==='dg-word'){$('#dg-go').disabled=ev.target.value.trim().toUpperCase()!==ev.target.dataset.word}
+ else if(ev.target.id==='mig-word'){$('#mig-go').disabled=ev.target.value.trim().toUpperCase()!==ev.target.dataset.word||!(mig.plan&&mig.plan.count)}
+ else if(ev.target.id==='mig-text'&&mig){mig.text=ev.target.value}});
 function splitShared(){var t=$('#p-text'),u=$('#p-url');if(!t||!u||u.value.trim())return;var s=parseShared(t.value);if(s.url){u.value=s.url;t.value=s.text;toast('Link erkannt und abgetrennt')}}
 
 /* ---------- Karten ---------- */
@@ -564,13 +630,17 @@ function welcomeCard(){
  if(!isEmptyDb())return '';
  return '<div class="card welcome"><h3>Willkommen bei DebateBase 3</h3><p>Deine Datenbank auf diesem Gerät ist noch leer. Übernimm deine Daten aus Version 2 oder schau dich mit Beispieldaten um.</p>'+
  '<div class="btns" style="margin-top:12px"><button class="btn primary" data-act="goto-import">Daten aus Version 2 übernehmen</button><button class="btn" data-act="load-sample">Beispieldaten laden</button></div></div>'}
+function backupHint(){
+ if(!Repo.ready||isEmptyDb())return '';var d=daysSince(Repo.db.meta.lastExport);
+ if(d!==null&&d<14)return '';
+ return '<div class="card"><p style="color:var(--fg);margin:0">'+(d===null?'Du hast noch keine Sicherungsdatei heruntergeladen.':'Deine letzte Sicherungsdatei ist '+d+' Tage alt.')+' Eine Datei schützt deine Daten, falls das Handy verloren geht oder Chrome zurückgesetzt wird.</p><button class="btn block" style="margin-top:10px" data-act="download">Sicherungsdatei herunterladen</button></div>'}
 function viewDashboard(){
  var E=Repo.all('entries'),S=Repo.all('sources'),A=Repo.all('args');
  var open=E.filter(function(e){return e.type==='frage'||e.status==='pruefung'}).sort(function(a,b){return (b.updated||0)-(a.updated||0)});
  var recent=[].concat(E.map(function(o){return {k:'Wissen',a:'open-entry',o:o,t:o.created}}),S.map(function(o){return {k:'Quelle',a:'open-source',o:o,t:o.created}}),A.map(function(o){return {k:'Argument',a:'open-arg',o:o,t:o.created}})).sort(function(a,b){return b.t-a.t}).slice(0,6);
  var cnt={};E.forEach(function(e){cnt[e.status]=(cnt[e.status]||0)+1});
  var keys=Object.keys(STATUS).filter(function(k){return cnt[k]});
- return welcomeCard()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
+ return welcomeCard()+backupHint()+'<div class="tiles"><button class="tile" data-go="wissen"><b>'+E.length+'</b><span>Wissens&shy;einträge</span></button><button class="tile" data-go="quellen"><b>'+S.length+'</b><span>Quellen</span></button><button class="tile" data-go="argumente"><b>'+A.length+'</b><span>Argumentations&shy;karten</span></button></div><p class="note" style="margin-top:-8px">'+Repo.all('links').length+' Verknüpfungen · '+Repo.all('posts').length+' X-Beiträge</p>'+
  '<section class="sec"><h2>Neu anlegen</h2><div class="actions"><button class="btn primary" data-act="new-entry">'+ic('plus',18)+'Neuer Eintrag</button><button class="btn" data-act="new-source">'+ic('plus',18)+'Neue Quelle</button><button class="btn" data-act="new-arg">'+ic('plus',18)+'Neue Karte</button><button class="btn" data-act="new-research">'+ic('search',18)+'Neue Recherche</button><button class="btn block" style="grid-column:1/-1" data-act="new-post">'+ic('link',18)+'X-Beitrag erfassen</button></div></section>'+
  '<section class="sec"><div class="sec-h"><h2>Offene Recherchen ('+open.length+')</h2></div>'+(open.length?open.map(function(e){return '<button class="row" data-act="open-entry" data-id="'+esc(e.id)+'"><div><b>'+esc(e.title)+'</b><small>'+esc(TYPES[e.type]||e.type)+(e.topic?' · '+esc(e.topic):'')+'</small></div>'+stChip(e.status)+'</button>'}).join(''):empty('Keine offenen Recherchen. Offene Fragen und Einträge „In Prüfung“ erscheinen hier.'))+'</section>'+
  (recent.length?'<section class="sec"><h2>Zuletzt hinzugefügt</h2>'+recent.map(function(r){return '<button class="row" data-act="'+r.a+'" data-id="'+esc(r.o.id)+'"><span class="kind">'+r.k+'</span><div><b>'+esc(r.o.title)+'</b><small>'+rel(r.t)+'</small></div></button>'}).join('')+'</section>':'')+
@@ -636,7 +706,7 @@ function render(){
  var v={dashboard:viewDashboard,wissen:viewLibrary,argumente:viewArgs,quellen:viewSources,diskussion:viewDisc,einstellungen:viewSettings}[R[0]];
  $('#view').innerHTML=v();
  if(R[0]==='wissen')paintList();if(R[0]==='argumente')paintArgs();if(R[0]==='quellen')paintSources();if(R[0]==='diskussion')paintDisc();
- if(R[0]==='einstellungen'){paintUsage();if(ui.focusImport){ui.focusImport=false;var s=$('#sec-import');if(s){s.scrollIntoView({block:'start'});$('#imp').focus({preventScroll:true})}}}
+ if(R[0]==='einstellungen'){paintUsage()}
  applyTheme()}
 function route(){var h=location.hash.slice(1);ui.route=ROUTES.some(function(r){return r[0]===h})?h:'dashboard';closeSheet();render();if(!ui.focusImport)window.scrollTo(0,0)}
 
@@ -674,14 +744,17 @@ document.addEventListener('click',function(ev){
   case 'disc-save':entryForm(null,{title:ui.dq.trim()});break;
   case 'export':var x=$('#exp');x.value=JSON.stringify(buildExport(),null,2);x.hidden=false;$('#expCopy').hidden=false;x.focus();x.select();break;
   case 'copy-export':copy($('#exp').value,'Export kopiert');break;
-  case 'import':doImport();break;
-  case 'confirm-import':applyImport();break;
+  case 'mig-check':migCheck();break;
+  case 'mig-back':mig.step=mig.step===3?2:1;mig.result=null;if(mig.step===2){var cur=Migrate.analyze(Migrate.parse(mig.text).data,currentData(),KNOWN);mig.a=cur}migRender();break;
+  case 'mig-apply':migApply();break;
+  case 'mig-copy-report':copy(migReport(),'Bericht kopiert');break;
+  case 'download':downloadExport();break;
   case 'reset-sample':dangerSheet('reset');break;
   case 'wipe':dangerSheet('wipe');break;
   case 'do-danger':doDanger(v);break;
   case 'restore-backup':if(armed(b,'Sicher? Tippen'))restoreBackup(id);break;
   case 'check-data':render();toast('Datenprüfung abgeschlossen');break;
-  case 'goto-import':ui.focusImport=true;if(ui.route==='einstellungen')render();else location.hash='einstellungen';break;
+  case 'goto-import':case 'open-migration':migStart();break;
   case 'load-sample':if(isEmptyDb())Repo.replace(seed()).then(function(){render();toast('Beispieldaten geladen')});break;
   case 'new-post':postForm();break;
   case 'open-post':postDetail(id);break;
@@ -701,7 +774,8 @@ document.addEventListener('input',function(ev){var i=ev.target.id;
  if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}});
 document.addEventListener('change',function(ev){var i=ev.target.id,v=ev.target.value;
  if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}
- else if(i==='impFile'&&ev.target.files[0]){var r=new FileReader();r.onload=function(){$('#imp').value=String(r.result);toast('Datei geladen. Jetzt „Prüfen und importieren“ tippen.')};r.onerror=function(){toast('Datei konnte nicht gelesen werden',true)};r.readAsText(ev.target.files[0])}});
+ else if(i==='mig-file'&&ev.target.files[0]){var fl=ev.target.files[0],r=new FileReader();r.onload=function(){mig.text=String(r.result);mig.fileName=fl.name+' ('+Math.round(fl.size/1024)+' KB)';mig.error='';migRender()};r.onerror=function(){mig.error='Die Datei konnte nicht gelesen werden.';migRender()};r.readAsText(fl)}
+ else if(ev.target.name==='mig-mode'){mig.mode=v;migRender(true)}else if(ev.target.name==='mig-conflict'){mig.conflict=v;migRender(true)}});
 document.addEventListener('submit',function(ev){ev.preventDefault();var f=ev.target,k=f.dataset.form;if(k==='entry')saveEntry(f);else if(k==='source')saveSource(f);else if(k==='arg')saveArg(f);else if(k==='link')saveLink(f);else if(k==='post')savePost(f,ev.submitter&&ev.submitter.value)});
 window.addEventListener('hashchange',route);
 /* Speicherfehler wurden bereits angezeigt; nicht zusätzlich als unbehandelt melden. */

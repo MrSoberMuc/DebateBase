@@ -1,75 +1,9 @@
 /* Automatische Tests für Etappe 1 (laufen in Chrome ohne Bildschirm).
  * Aufruf: node tests/etappe1.test.mjs
  * Benötigt Playwright und Google Chrome. Wird nicht für den Betrieb der App gebraucht. */
-import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
-
-const require = createRequire(import.meta.url);
-let chromium;
-try { ({ chromium } = require('playwright')); }
-catch { ({ chromium } = require('/opt/npm-tools/node_modules/playwright')); }
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png' };
-const server = http.createServer((req, res) => {
-  let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  if (p.endsWith('/')) p += 'index.html';
-  const f = path.join(ROOT, p);
-  if (!f.startsWith(ROOT) || !fs.existsSync(f)) { res.writeHead(404); res.end('nicht gefunden'); return; }
-  res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' });
-  fs.createReadStream(f).pipe(res);
-});
-await new Promise(r => server.listen(0, '127.0.0.1', r));
-const BASE = `http://127.0.0.1:${server.address().port}/`;
-
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
-const results = [];
-let failed = 0;
-async function test(name, fn) {
-  try { await fn(); results.push(['OK  ', name]); }
-  catch (e) { failed++; results.push(['FEHL', name + ' → ' + (e && e.message ? e.message.split('\n')[0] : e)]); }
-}
-function assert(c, msg) { if (!c) throw new Error(msg || 'Annahme verletzt'); }
-
-async function newPage(ctx, width = 390) {
-  const page = await ctx.newPage();
-  await page.setViewportSize({ width, height: 800 });
-  await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
-  page.errors = [];
-  page.on('pageerror', e => page.errors.push(e.message));
-  page.on('console', m => { if (m.type() === 'error' && !/fonts|ERR_FAILED|net::/.test(m.text())) page.errors.push(m.text()); });
-  await page.goto(BASE);
-  await page.waitForFunction(() => window.DebateBase && document.querySelector('#nav a'));
-  return page;
-}
-const counts = page => page.evaluate(() => { const D = window.DebateBase.Repo.db; return { e: D.entries.length, s: D.sources.length, a: D.args.length, l: D.links.length, p: D.posts.length }; });
-const idbCounts = page => page.evaluate(() => Promise.all(['entries', 'sources', 'args', 'links', 'posts', 'topics', 'tags', 'backups'].map(s => DB.getAll(s).then(r => [s, r.length]))).then(Object.fromEntries));
-async function reload(page) { await page.reload(); await page.waitForFunction(() => window.DebateBase && document.querySelector('#nav a')); }
-async function go(page, route) { await page.evaluate(r => { location.hash = r; }, route); await page.waitForTimeout(80); }
-
-const V2_EXPORT = {
-  app: 'DebateBase', version: 2, exportedAt: '2026-11-05T17:00:00.000Z',
-  counts: { entries: 3, sources: 2, args: 1, links: 2, posts: 1 },
-  entries: [
-    { id: 'e_v2a', title: 'Testeintrag Alpha', description: 'Beschreibung A', type: 'fakt', status: 'belegt', topic: 'Politik', tags: ['Energie', 'Test'], sourceIds: ['s_v2a'], postId: '', claimCore: 'Kern A', reason: '', evidence: 'Beleg A', limits: '', conclusion: '', created: 1762300000000, updated: 1762300000000 },
-    { id: 'e_v2b', title: 'Testeintrag Beta', description: 'Beschreibung B', type: 'behauptung', status: 'umstritten', topic: 'Geschichte', tags: ['Test'], sourceIds: [], postId: 'p_v2a', claimCore: '', reason: 'Grund B', evidence: '', limits: 'Grenze B', conclusion: 'Schluss B', created: 1762310000000, updated: 1762320000000 },
-    { id: 'e_v2c', title: 'Offene Frage Gamma', description: '', type: 'frage', status: 'pruefung', topic: 'Wissenschaft', tags: [], sourceIds: ['s_v2b'], postId: '', created: 1762330000000, updated: 1762330000000 }
-  ],
-  sources: [
-    { id: 's_v2a', title: 'Quelle Eins', publisher: 'Amt', year: '2024', kind: 'Statistik', url: 'https://example.org/a', note: '', created: 1762200000000 },
-    { id: 's_v2b', title: 'Quelle Zwei', publisher: 'Uni', year: '2020', kind: 'Studie', url: '', note: 'Notiz', created: 1762210000000 }
-  ],
-  args: [{ id: 'a_v2a', title: 'Karte Eins', claim: 'Behauptung', counter: 'Gegenargument', topic: 'Politik', status: 'teilweise', sourceIds: ['s_v2a'], created: 1762250000000 }],
-  links: [
-    { id: 'l_v2a', type: 'unterstuetzt', fromK: 'entries', fromId: 'e_v2a', toK: 'args', toId: 'a_v2a', note: 'Notiz L', created: 1762260000000 },
-    { id: 'l_v2b', type: 'widerspricht', fromK: 'entries', fromId: 'e_v2b', toK: 'entries', toId: 'e_v2a', note: '', created: 1762270000000 }
-  ],
-  posts: [{ id: 'p_v2a', url: 'https://x.com/beispiel/status/1234567890', handle: 'beispiel', tweetId: '1234567890', text: 'Ein Beitrag mit Text.', topic: 'Geschichte', note: 'meine Notiz', convertedTo: ['e_v2b'], created: 1762305000000 }]
-};
-
+import { ROOT, browser, test, assert, newPage, counts, idbCounts, reload, go, finish, V2_EXPORT } from './harness.mjs';
 /* ---------------- Tests ---------------- */
 await test('Erster Start: leere Datenbank, Willkommenskarte, keine Fehler', async () => {
   const ctx = await browser.newContext(); const page = await newPage(ctx);
@@ -206,11 +140,11 @@ await test('X-Beitrag: Link-Erkennung, Duplikat, Umwandlung in Eintrag', async (
 
 await test('Import Version-2-Export in leere Datenbank: alles übernommen, Sicherung angelegt', async () => {
   const ctx = await browser.newContext(); const page = await newPage(ctx);
-  await page.click('[data-act=goto-import]'); await page.waitForTimeout(150);
-  await page.fill('#imp', JSON.stringify(V2_EXPORT));
-  await page.click('[data-act=import]');
-  assert(await page.isVisible('text=Import prüfen'), 'Vorschau fehlt');
-  await page.click('[data-act=confirm-import]'); await page.waitForTimeout(250);
+  await page.click('[data-act=goto-import]');
+  await page.fill('#mig-text', JSON.stringify(V2_EXPORT));
+  await page.click('[data-act=mig-check]');
+  assert(await page.isVisible('h2.t:has-text("Vorschau")'), 'Vorschau fehlt');
+  await page.click('[data-act=mig-apply]'); await page.waitForSelector('text=Import abgeschlossen');
   await reload(page);
   const c = await counts(page);
   assert(c.e === 3 && c.s === 2 && c.a === 1 && c.l === 2 && c.p === 1, 'Zählung: ' + JSON.stringify(c));
@@ -350,7 +284,4 @@ await test('Tastatur: Karte mit Enter öffnen, Escape schließt', async () => {
   await ctx.close();
 }
 
-await browser.close(); server.close();
-for (const [s, n] of results) console.log(s, n);
-console.log(`\n${results.length - failed} von ${results.length} Tests bestanden.`);
-process.exit(failed ? 1 : 0);
+await finish();
