@@ -47,6 +47,19 @@ Browser und installierte App nutzen **dieselbe Datenbank** auf dem Gerät.
 
 **Verknüpfungen** zwischen Einträgen und Karten: Unterstützt · Widerspricht · Ergänzt · Relativiert · Basiert auf · Zitiert
 
+### Intelligente Suche (ab Version 3.1.0)
+
+Die Suche in Wissen, Argumente, Quellen und Diskussion findet auch:
+
+- **Wortformen:** „Sanktion“ findet „Sanktionen“
+- **verwandte Begriffe:** „UNO“ findet „Vereinte Nationen“ (eigene Gruppen unter Optionen → Verwandte Begriffe)
+- **kleine Tippfehler:** „Sanktoinen“ findet „Sanktionen“
+- **Wortteile:** „Klima“ findet „Klimawandel“
+
+Treffer im Titel und in den Tags zählen mehr als Treffer in der Beschreibung (Sortierung „Relevanz“). Unter jedem Treffer steht **„Warum“**. Enthält kein Eintrag alle Suchwörter, zeigt die App **Teiltreffer** und nennt die fehlenden Wörter. In jeder Detailansicht schlägt **„Verwandte Inhalte“** passende Einträge und Karten vor, jeweils mit Begründung.
+
+**Wichtig:** Das ist keine KI. Die App vergleicht Wörter nach festen Regeln und versteht keine Bedeutung. Alles läuft auf dem Gerät.
+
 ## 3. X-Beiträge teilen
 
 Voraussetzung: DebateBase ist **installiert**.
@@ -112,6 +125,7 @@ Wenn eine neue Version veröffentlicht ist, erscheint in der App **„Eine neue 
 | `app.js` | Oberfläche, Bedienung, Teilen-Eingang, Installation |
 | `db.js` | Datenbank (IndexedDB) mit Versionierung und Transaktionen |
 | `migrate.js` | Import: Format erkennen, prüfen, Konflikte, Nachkontrolle |
+| `analyse.js` | Lokale Analyse ohne KI: intelligente Suche, verwandte Inhalte (Phase 4) |
 | `service-worker.js` | Offline-Speicher der App-Dateien, Updates, Empfang geteilter Beiträge |
 | `manifest.json` | Angaben für Installation und Teilen-Ziel |
 | `icons/` | App-Icons (erzeugt mit `tools/make-icons.py`) |

@@ -172,3 +172,10 @@ details.card[data-kind="skipped"] summary b{color:var(--danger)}
 .update .btn{flex:0 0 auto}
 /* Als installierte App: kein Überziehen der Seite beim Scrollen am Rand */
 @media (display-mode: standalone){html,body{overscroll-behavior-y:none}}
+
+/* Phase 4: Begründung von Suchtreffern und verwandte Inhalte */
+.why{margin:8px 0 0!important;font-size:.8125rem;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+.why b{color:var(--fg);font-weight:600}
+.why .miss{color:var(--st-pruefung)}
+.note.partial{padding:8px 12px;border:1px dashed var(--line);border-radius:12px}
+.lk-rel{--lc:var(--accent)}

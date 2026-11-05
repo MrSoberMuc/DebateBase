@@ -58,6 +58,20 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] F3 Lange Titel und Links werden umgebrochen, nichts ragt heraus.
 - [ ] F4 „Für X kopieren“ im Diskussionsmodus → in X einfügen klappt.
 
+## H. Phase 4, Etappe 1: Intelligente Suche (ab Version 3.1.0)
+
+*Mit den Beispieldaten oder eigenen Einträgen testen. Erst das Update (G1) durchführen.*
+
+- [ ] H1 Wissen → „Sanktion“ suchen: der Eintrag zu Wirtschaftssanktionen erscheint, darunter „Warum: Wortform …“.
+- [ ] H2 „UNO“ suchen: der Eintrag zu den Vereinten Nationen erscheint („verwandter Begriff …“).
+- [ ] H3 Mit Tippfehler suchen, z. B. „Sanktoinen“: Treffer mit „ähnliche Schreibweise“.
+- [ ] H4 „klima“ suchen: Sortierung „Relevanz“, der Eintrag mit „Klima“ im Titel steht oben. Auf „A bis Z“ umstellen klappt.
+- [ ] H5 Zwei Wörter suchen, die nie zusammen vorkommen (z. B. „Ozonschicht Sanktionen“): Hinweis „Teiltreffer“ und „nicht gefunden: …“.
+- [ ] H6 Einen Eintrag öffnen: unten „Verwandte Inhalte“ mit Begründung; das Ketten-Symbol öffnet „Neue Verknüpfung“ mit vorausgewähltem Partner.
+- [ ] H7 Optionen → „Verwandte Begriffe“: eine eigene Gruppe speichern, App neu starten, Suche nutzt sie.
+- [ ] H8 Flugmodus: Suche mit Begründungen funktioniert.
+- [ ] H9 Nach dem Update: Anzahl der Einträge, Quellen, Karten und Verknüpfungen wie vorher (Optionen → Datensicherheit).
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

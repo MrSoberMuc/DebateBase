@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.0.0';
+var APP_VERSION='3.1.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -174,7 +174,7 @@ function checkIntegrity(){
  return iss}
 
 /* ---------- Hilfen ---------- */
-var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'neu',sq:'',skind:'',aq:'',dq:'',donly:false,focusImport:false};
+var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,focusImport:false};
 var ROUTES=[['dashboard','Dashboard','Start','home','Übersicht über deine Wissensdatenbank'],['wissen','Wissensbibliothek','Wissen','book','Fakten, Definitionen, Studien und mehr'],['argumente','Argumentationsarchiv','Argumente','scale','Behauptungen mit Gegenargumenten'],['quellen','Quellenarchiv','Quellen','doc','Belege und Fundstellen'],['diskussion','Diskussionsmodus','Diskussion','chat','Schnell nachschlagen und kopieren'],['einstellungen','Einstellungen','Optionen','sliders','Darstellung und Daten']];
 function norm(s){return String(s||'').toLowerCase()}
 function matches(hay,q){var ts=norm(q).split(/\s+/).filter(Boolean),h=norm(hay);return ts.every(function(t){return h.indexOf(t)>=0})}
@@ -204,6 +204,49 @@ function xText(kind,o){
  var tail=src?' Quelle: '+src:'';
  if((txt+tail).length>280){txt=txt.slice(0,Math.max(0,277-tail.length))+'…'}
  return txt+tail}
+
+/* ================= Intelligente Suche (Phase 4) =================
+ * Die Rechenregeln stehen in analyse.js. Hier wird nur festgelegt, welche
+ * Felder durchsucht werden und wie wichtig sie sind (Gewicht).
+ * Es arbeitet keine KI: Wörter, Wortformen, verwandte Begriffe, Tippfehler. */
+function userSynonyms(){var s=Repo.db&&Repo.db.settings.synonyms;return Array.isArray(s)?s.filter(Array.isArray):[]}
+var synCache={key:null,idx:null};
+function synIdx(){var u=userSynonyms(),k=JSON.stringify(u);if(synCache.key!==k){synCache.key=k;synCache.idx=Analyse.synIndex(Analyse.SYNONYMS.concat(u))}return synCache.idx}
+function srcText(ids){return (ids||[]).map(function(i){var s=Repo.get('sources',i);return s?s.title+' '+(s.publisher||''):''}).join(' ; ')}
+function docFor(k,o){
+ var f=function(label,weight,text){return {label:label,weight:weight,text:text==null?'':String(text)}},fields;
+ if(k==='entries')fields=[f('Titel',5,o.title),f('Tags',4,(o.tags||[]).join(', ')),f('Kernaussage',3,o.claimCore),f('Themengebiet',3,o.topic),f('Quellen',2,srcText(o.sourceIds)),f('Beschreibung',2,o.description),f('Begründung',1,o.reason),f('Evidenz',1,o.evidence),f('Einschränkungen',1,o.limits),f('Schlussfolgerung',1,o.conclusion),f('Typ und Status',1,(TYPES[o.type]||o.type||'')+' '+(STATUS[o.status]||o.status||'')),f('Verknüpfungen',1,linkText('entries',o.id))];
+ else if(k==='args')fields=[f('Titel',5,o.title),f('Behauptung',3,o.claim),f('Themengebiet',3,o.topic),f('Gegenargument',2,o.counter),f('Quellen',2,srcText(o.sourceIds)),f('Status',1,STATUS[o.status]||o.status),f('Verknüpfungen',1,linkText('args',o.id))];
+ else if(k==='sources')fields=[f('Titel',5,o.title),f('Herausgeber',3,o.publisher),f('Jahr',2,o.year),f('Art',2,o.kind),f('Notiz',1,o.note)];
+ else fields=[f('Beitragstext',3,o.text),f('Konto',3,o.handle),f('Thema',3,o.topic),f('Notiz',1,o.note),f('Link',1,o.url)];
+ return {id:o.id,kind:k,item:o,fields:fields,tags:o.tags||[],sourceIds:o.sourceIds||[],topic:o.topic||''}}
+function smartSearch(k,list,q){return Analyse.search(list.map(function(o){return docFor(k,o)}),q,{synIndex:synIdx()})}
+/* Ergebnis einer Suche: Liste der Datensätze + Begründungen */
+function ranked(k,list,q){
+ var r=smartSearch(k,list,q),partial=!r.full.length,R=partial?r.partial:r.full,why={};
+ R.forEach(function(x){why[x.doc.id]=x});
+ return {items:R.map(function(x){return x.doc.item}),why:why,partial:partial&&R.length>0}}
+function whyLine(r){if(!r)return '';
+ return '<p class="why"><b>Warum:</b> '+esc(r.reasons.slice(0,3).join(' · ')+(r.reasons.length>3?' · …':''))+(r.missing&&r.missing.length?' <span class="miss">· nicht gefunden: '+esc(r.missing.join(', '))+'</span>':'')+'</p>'}
+var PARTIAL_NOTE='<p class="note partial">Kein Treffer enthält alle Suchwörter. Hier sind Teiltreffer:</p>';
+/* Verwandte Inhalte in der Detailansicht (ohne die bereits direkt verknüpften) */
+function relatedSection(k,id){
+ var me=Repo.get(k,id);if(!me)return '';
+ var docs=Repo.all('entries').map(function(o){return docFor('entries',o)}).concat(Repo.all('args').map(function(o){return docFor('args',o)}));
+ var R=Analyse.related(docFor(k,me),docs,{links:Repo.all('links'),ltypes:LTYPES,max:12,
+  label:function(kk,i){var x=itemOf(kk,i);return x?x.title:i},sourceTitle:function(s){var x=Repo.get('sources',s);return x?x.title:s}}).filter(function(r){return !r.linked}).slice(0,5);
+ return '<div class="sec" id="related"><h2>Verwandte Inhalte ('+R.length+')</h2><p class="note">Vorschläge nach festen Regeln: gemeinsame Tags und Quellen, indirekte Verknüpfungen, ähnliche Wörter. Keine inhaltliche Prüfung.</p>'+
+ (R.length?R.map(function(r){var o=r.doc.item;
+  return '<div class="lk lk-rel"><button class="lk-main" data-act="open-item" data-k="'+r.doc.kind+'" data-id="'+esc(o.id)+'"><small>'+KINDNAME[r.doc.kind]+(r.doc.kind==='entries'?' · '+esc(TYPES[o.type]||o.type):'')+'</small><b>'+esc(o.title)+'</b><span>'+esc(r.reasons.join(' · '))+'</span></button>'+
+  '<button class="icon-btn sm" data-act="link-related" data-ck="'+k+'" data-cid="'+esc(id)+'" data-v="'+r.doc.kind+':'+esc(o.id)+'" aria-label="Verknüpfung anlegen">'+ic('link',18)+'</button></div>'}).join(''):'<p class="note">Keine weiteren verwandten Inhalte gefunden.</p>')+'</div>'}
+/* Eigene verwandte Begriffe: eine Gruppe pro Zeile, durch Komma getrennt */
+function parseSynText(t){return String(t||'').split(/\n+/).map(function(l){var seen={};return l.split(/[,;]+/).map(function(x){return x.trim()}).filter(function(x){var n=Analyse.flat(x);if(!n||seen[n])return false;seen[n]=1;return true})}).filter(function(g){return g.length>=2})}
+function synSection(){
+ var u=userSynonyms();
+ return '<section class="sec" id="sec-syn"><h2>Verwandte Begriffe für die Suche</h2><div class="card"><p style="margin:0 0 8px">Die Suche findet auch verwandte Begriffe, z. B. „Vereinte Nationen“ bei der Suche nach „UNO“. Eine Gruppe pro Zeile, Begriffe durch Komma trennen.</p>'+
+ '<textarea class="sm" id="syn-text" aria-label="Eigene verwandte Begriffe" placeholder="z. B. Bundeswehr, Streitkräfte">'+esc(u.map(function(g){return g.join(', ')}).join('\n'))+'</textarea>'+
+ '<button class="btn primary block" style="margin-top:8px" data-act="save-syn">Eigene Begriffe speichern</button>'+
+ '<details style="margin-top:10px"><summary>Eingebaute Gruppen ansehen ('+Analyse.SYNONYMS.length+')</summary><ul class="issues">'+Analyse.SYNONYMS.map(function(g){return '<li>'+esc(g.join(' = '))+'</li>'}).join('')+'</ul></details></div></section>'}
 
 /* ---------- Sheet ---------- */
 function openSheet(html){var s=$('#sheet');s.innerHTML=html;$('#overlay').hidden=false;document.body.style.overflow='hidden';s.scrollTop=0}
@@ -248,7 +291,7 @@ function entryDetail(id){
  (e.description?'<p class="body" style="margin:0">'+esc(e.description)+'</p>':'<p class="note">Keine Beschreibung.</p>')+
  extraView(e)+postOrigin(e)+'<dl><dt>Themengebiet</dt><dd>'+esc(e.topic||'–')+'</dd><dt>Tags</dt><dd>'+((e.tags||[]).length?e.tags.map(function(t){return '<span class="chip tag">'+esc(t)+'</span>'}).join(' '):'–')+'</dd><dt>Erstellt</dt><dd>'+fmtDate(e.created)+'</dd><dt>Geändert</dt><dd>'+fmtDate(e.updated||e.created)+'</dd></dl>'+
  '<div class="sec"><h2>Quellen</h2>'+(S.length?S.map(function(s){return '<button class="row" data-act="open-source" data-id="'+esc(s.id)+'"><div><b>'+esc(s.title)+'</b><small>'+esc(s.publisher||'')+(s.year?', '+esc(s.year):'')+'</small></div></button>'}).join(''):'<p class="note">Keine Quelle verknüpft.</p>')+'</div>'+
- linkSection('entries',id)+delNote('entries',id)+'<div class="btns"><button class="btn" data-act="edit-entry" data-id="'+esc(id)+'">'+ic('edit',18)+'Bearbeiten</button><button class="btn" data-act="copyx" data-k="entries" data-id="'+esc(id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn danger" data-act="del-entry" data-id="'+esc(id)+'">'+ic('trash',18)+'Löschen</button></div>')}
+ linkSection('entries',id)+relatedSection('entries',id)+delNote('entries',id)+'<div class="btns"><button class="btn" data-act="edit-entry" data-id="'+esc(id)+'">'+ic('edit',18)+'Bearbeiten</button><button class="btn" data-act="copyx" data-k="entries" data-id="'+esc(id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn danger" data-act="del-entry" data-id="'+esc(id)+'">'+ic('trash',18)+'Löschen</button></div>')}
 
 /* ---------- Quelle ---------- */
 function sourceForm(id){
@@ -304,7 +347,7 @@ function argDetail(id){
  openSheet(sheetHead(a.title,'<div class="meta">'+stChip(a.status)+(a.topic?'<span class="chip">'+esc(a.topic)+'</span>':'')+'</div>')+
  '<div class="cols"><div class="pane pro"><small>Behauptung</small><span class="body">'+esc(a.claim||'–')+'</span></div><div class="pane con"><small>Gegenargument</small><span class="body">'+esc(a.counter||'–')+'</span></div></div>'+
  '<div class="sec"><h2>Quellen</h2>'+(S.length?S.map(function(s){return '<button class="row" data-act="open-source" data-id="'+esc(s.id)+'"><div><b>'+esc(s.title)+'</b><small>'+esc(s.publisher||'')+'</small></div></button>'}).join(''):'<p class="note">Keine Quelle verknüpft.</p>')+'</div>'+
- linkSection('args',id)+delNote('args',id)+'<div class="btns"><button class="btn" data-act="edit-arg" data-id="'+esc(id)+'">'+ic('edit',18)+'Bearbeiten</button><button class="btn" data-act="copyx" data-k="args" data-id="'+esc(id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn danger" data-act="del-arg" data-id="'+esc(id)+'">'+ic('trash',18)+'Löschen</button></div>')}
+ linkSection('args',id)+relatedSection('args',id)+delNote('args',id)+'<div class="btns"><button class="btn" data-act="edit-arg" data-id="'+esc(id)+'">'+ic('edit',18)+'Bearbeiten</button><button class="btn" data-act="copyx" data-k="args" data-id="'+esc(id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn danger" data-act="del-arg" data-id="'+esc(id)+'">'+ic('trash',18)+'Löschen</button></div>')}
 
 /* ================= Verknüpfungen ================= */
 var LTYPES={unterstuetzt:['Unterstützt','Wird unterstützt von'],widerspricht:['Widerspricht','Wird widersprochen von'],ergaenzt:['Ergänzt','Wird ergänzt von'],relativiert:['Relativiert','Wird relativiert von'],basiert:['Basiert auf','Grundlage für'],zitiert:['Zitiert','Wird zitiert von']};
@@ -331,8 +374,8 @@ function partnerOptions(k,id,sel){
  var grp=function(name,col){var a=Repo.all(col).filter(function(x){return !(col===k&&x.id===id)}).sort(function(a,b){return a.title.localeCompare(b.title,'de')});
   if(!a.length)return '';return '<optgroup label="'+name+'">'+a.map(function(x){var v=col+':'+x.id;return '<option value="'+esc(v)+'"'+(v===sel?' selected':'')+'>'+esc((col==='entries'?(TYPES[x.type]||x.type)+' · ':'')+x.title)+'</option>'}).join('')+'</optgroup>'};
  return h+grp('Wissenseinträge','entries')+grp('Argumentationskarten','args')}
-function linkForm(lid,k,id){
- var l=lid?Repo.get('links',lid):null,out=true,partner='',type='unterstuetzt',note='';
+function linkForm(lid,k,id,preset){
+ var l=lid?Repo.get('links',lid):null,out=true,partner=preset||'',type='unterstuetzt',note='';
  if(l){out=(l.fromK===k&&l.fromId===id);partner=out?l.toK+':'+l.toId:l.fromK+':'+l.fromId;type=l.type;note=l.note||''}
  var me=itemOf(k,id);
  openSheet(sheetHead(lid?'Verknüpfung bearbeiten':'Neue Verknüpfung','<p class="note" style="margin:0">Von: '+esc(me?me.title:'')+'</p>')+
@@ -443,10 +486,10 @@ function inboxCard(){var n=Inbox.items.length;if(!n)return '';
  return '<div class="card welcome"><h3>'+(n===1?'1 geteilter Beitrag wartet':n+' geteilte Beiträge warten')+'</h3><p>Aus der Android-Teilen-Funktion. Entscheide, ob du '+(n===1?'ihn':'sie')+' speichern willst.</p><div class="btns" style="margin-top:12px"><button class="btn primary" data-act="share-next">Ansehen</button></div></div>'}
 function afterShareDecision(){var next=Inbox.items[0];render();if(next)setTimeout(function(){shareSheet(next.id)},0)}
 function postTitle(p){var t=String(p.text||'').replace(/\s+/g,' ').trim();if(!t)return p.handle?'Beitrag von @'+p.handle:'X-Beitrag';var s=t.split(/(?<=[.!?])\s/)[0];return (s.length>90?s.slice(0,87).trimEnd()+'…':s)}
-function postCard(p){
+function postCard(p,why){
  var n=(p.convertedTo||[]).filter(function(i){return Repo.get('entries',i)}).length;
  return '<article class="card" role="button" tabindex="0" data-act="open-post" data-id="'+esc(p.id)+'"><div class="meta"><span class="chip">'+(p.handle?'@'+esc(p.handle):'X-Beitrag')+'</span>'+(p.url?'':'<span class="chip tag">ohne Link</span>')+(n?'<span class="chip tag">'+n+(n===1?' Eintrag':' Einträge')+' erstellt</span>':'')+'</div>'+
- '<p class="clamp" style="color:var(--fg);margin-top:8px">'+esc(p.text||p.url)+'</p><div class="foot">'+(p.topic?'<span>'+esc(p.topic)+'</span>':'')+'<span>'+rel(p.created)+'</span></div></article>'}
+ '<p class="clamp" style="color:var(--fg);margin-top:8px">'+esc(p.text||p.url)+'</p>'+whyLine(why)+'<div class="foot">'+(p.topic?'<span>'+esc(p.topic)+'</span>':'')+'<span>'+rel(p.created)+'</span></div></article>'}
 function postsSection(){var P=Repo.all('posts');
  return '<div class="sec" style="margin-top:8px"><h2>Gespeicherte X-Beiträge ('+P.length+')</h2>'+(P.length?P.map(postCard).join(''):empty('Noch keine Beiträge. Füge einen X-Link oder Beitragstext ein.'))+'</div>'}
 function postForm(id,preset){
@@ -493,7 +536,7 @@ function postOrigin(e){
  return '<div class="sec"><h2>Herkunft</h2><button class="row" data-act="open-post" data-id="'+esc(p.id)+'"><div><b>X-Beitrag'+(p.handle?' von @'+esc(p.handle):'')+'</b><small>'+esc((p.text||p.url).slice(0,120))+'</small></div></button></div>'}
 
 /* ================= Sicherung, Prüfung, Import ================= */
-function buildExport(){var D=Repo.db;return {app:'DebateBase',version:3,schema:DB.VERSION,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),counts:counts(D),settings:{theme:D.settings.theme},entries:D.entries,sources:D.sources,args:D.args,links:D.links,posts:D.posts}}
+function buildExport(){var D=Repo.db;return {app:'DebateBase',version:3,schema:DB.VERSION,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),counts:counts(D),settings:{theme:D.settings.theme,synonyms:userSynonyms()},entries:D.entries,sources:D.sources,args:D.args,links:D.links,posts:D.posts}}
 function pad(n){return (n<10?'0':'')+n}
 function fileStamp(d){d=d||new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())}
 /* Echter Datei-Download: Android legt die Datei im Ordner „Downloads“ ab. */
@@ -584,12 +627,18 @@ function migApply(){
  var reason=mig.mode==='replace'?'Vor Wiederherstellung aus Datei':'Vor Import';
  Repo.addBackup(reason).then(function(){
   return mig.mode==='replace'?Repo.replace(plan.write):Repo.bulkPut(plan.write)
- }).then(function(){return DB.readAll()}).then(function(stored){
+ }).then(function(){return importSynonyms()}).then(function(){return DB.readAll()}).then(function(stored){
   var ver=Migrate.verify(plan,stored);
   mig.result={ok:true,ver:ver};
   return Repo.logMigration({at:Date.now(),format:mig.a.format.label,mode:plan.mode,conflict:plan.conflict,written:plan.count,verified:ver.ok,problems:ver.problems.length})
  }).catch(function(e){mig.result={ok:false,error:e&&e.message?e.message:String(e)}}).then(function(){
   mig.busy=false;mig.step=3;render();migRender()})}
+/* Eigene verwandte Begriffe aus einer Sicherungsdatei übernehmen (zusammenführen, nichts löschen) */
+function importSynonyms(){var p;try{p=Migrate.parse(mig.text).data}catch(e){return null}
+ var inc=p&&p.settings&&Array.isArray(p.settings.synonyms)?p.settings.synonyms.filter(Array.isArray):[];if(!inc.length)return null;
+ var cur=userSynonyms(),key=function(g){return g.map(Analyse.flat).sort().join('|')},have={};cur.forEach(function(g){have[key(g)]=1});
+ var add=inc.map(function(g){return g.map(function(x){return String(x)})}).filter(function(g){return g.length>=2&&!have[key(g)]});
+ return add.length?Repo.setSetting('synonyms',cur.concat(add)):null}
 function migStep3(){
  var r=mig.result,plan=mig.plan,h;
  if(!r.ok){
@@ -676,7 +725,7 @@ function bkCounts(c){c=c||{};return (c.entries||0)+' Einträge, '+(c.sources||0)
 function viewSettings(){
  var th=Repo.db.settings.theme,D=Repo.db,ts=D.meta&&D.meta.lastSaved,iss=checkIntegrity();
  var prot=Repo.persisted===true?'Aktiv':Repo.persisted===false?'Nicht gewährt (Chrome entscheidet selbst; nach der Installation meist aktiv)':'Unbekannt';
- return '<section class="sec"><h2>Darstellung</h2><div class="seg">'+[['system','System'],['hell','Hell'],['dunkel','Dunkel']].map(function(p){return '<button data-act="set-theme" data-v="'+p[0]+'" aria-pressed="'+(th===p[0])+'">'+p[1]+'</button>'}).join('')+'</div></section>'+viewApp()+
+ return '<section class="sec"><h2>Darstellung</h2><div class="seg">'+[['system','System'],['hell','Hell'],['dunkel','Dunkel']].map(function(p){return '<button data-act="set-theme" data-v="'+p[0]+'" aria-pressed="'+(th===p[0])+'">'+p[1]+'</button>'}).join('')+'</div></section>'+viewApp()+synSection()+
  '<section class="sec"><h2>Datensicherheit</h2><div class="card"><dl><dt>Einträge</dt><dd>'+D.entries.length+'</dd><dt>Quellen</dt><dd>'+D.sources.length+'</dd><dt>Karten</dt><dd>'+D.args.length+'</dd><dt>Verknüpfungen</dt><dd>'+D.links.length+'</dd><dt>X-Beiträge</dt><dd>'+D.posts.length+'</dd>'+
  '<dt>Speicher</dt><dd>'+(Repo.ready?'IndexedDB auf diesem Gerät':'Nur Arbeitsspeicher, geht beim Schließen verloren')+'</dd>'+
  '<dt>Schutz vor Löschen</dt><dd>'+prot+'</dd><dt>Belegt</dt><dd id="usage">…</dd><dt>Datenbank</dt><dd>Version '+DB.VERSION+'</dd>'+
@@ -710,15 +759,15 @@ document.addEventListener('input',function(ev){if(ev.target.id==='dg-word'){$('#
 function splitShared(){var t=$('#p-text'),u=$('#p-url');if(!t||!u||u.value.trim())return;var s=parseShared(t.value);if(s.url){u.value=s.url;t.value=s.text;toast('Link erkannt und abgetrennt')}}
 
 /* ---------- Karten ---------- */
-function entryCard(e){
+function entryCard(e,why){
  return '<article class="card" role="button" tabindex="0" data-act="open-entry" data-id="'+esc(e.id)+'"><div class="meta"><span class="chip">'+esc(TYPES[e.type]||e.type)+'</span>'+stChip(e.status)+'</div><h3>'+esc(e.title)+'</h3>'+((e.description||e.claimCore)?'<p class="clamp">'+esc(e.description||e.claimCore)+'</p>':'')+
- '<div class="foot">'+linkBadge('entries',e.id)+(e.topic?'<span>'+esc(e.topic)+'</span>':'')+(e.tags||[]).slice(0,3).map(function(t){return '<span class="chip tag">'+esc(t)+'</span>'}).join('')+'</div></article>'}
-function argCard(a){
+ whyLine(why)+'<div class="foot">'+linkBadge('entries',e.id)+(e.topic?'<span>'+esc(e.topic)+'</span>':'')+(e.tags||[]).slice(0,3).map(function(t){return '<span class="chip tag">'+esc(t)+'</span>'}).join('')+'</div></article>'}
+function argCard(a,why){
  return '<article class="card" role="button" tabindex="0" data-act="open-arg" data-id="'+esc(a.id)+'"><div class="meta">'+stChip(a.status)+(a.topic?'<span class="chip">'+esc(a.topic)+'</span>':'')+'</div><h3>'+esc(a.title)+'</h3>'+
- '<div class="cols"><div class="pane pro"><small>Behauptung</small><span class="clamp" style="-webkit-line-clamp:2">'+esc(a.claim)+'</span></div><div class="pane con"><small>Gegenargument</small><span class="clamp" style="-webkit-line-clamp:3">'+esc(a.counter)+'</span></div></div>'+(linksOf('args',a.id).length?'<div class="foot">'+linkBadge('args',a.id)+'</div>':'')+'</article>'}
-function srcCard(s){
+ '<div class="cols"><div class="pane pro"><small>Behauptung</small><span class="clamp" style="-webkit-line-clamp:2">'+esc(a.claim)+'</span></div><div class="pane con"><small>Gegenargument</small><span class="clamp" style="-webkit-line-clamp:3">'+esc(a.counter)+'</span></div></div>'+whyLine(why)+(linksOf('args',a.id).length?'<div class="foot">'+linkBadge('args',a.id)+'</div>':'')+'</article>'}
+function srcCard(s,why){
  var n=citedBy(s.id).length;
- return '<article class="card" role="button" tabindex="0" data-act="open-source" data-id="'+esc(s.id)+'"><div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+(s.year?'<span class="chip tag">'+esc(s.year)+'</span>':'')+'</div><h3>'+esc(s.title)+'</h3><p>'+esc(s.publisher||'')+'</p><div class="foot"><span>Zitiert in '+n+(n===1?' Eintrag':' Einträgen')+'</span></div></article>'}
+ return '<article class="card" role="button" tabindex="0" data-act="open-source" data-id="'+esc(s.id)+'"><div class="meta"><span class="chip">'+esc(s.kind)+'</span>'+(s.year?'<span class="chip tag">'+esc(s.year)+'</span>':'')+'</div><h3>'+esc(s.title)+'</h3><p>'+esc(s.publisher||'')+'</p>'+whyLine(why)+'<div class="foot"><span>Zitiert in '+n+(n===1?' Eintrag':' Einträgen')+'</span></div></article>'}
 function empty(t){return '<div class="empty">'+t+'</div>'}
 
 /* ---------- Dashboard ---------- */
@@ -747,29 +796,31 @@ function viewDashboard(){
 /* ---------- Wissensbibliothek ---------- */
 function viewLibrary(){
  var topics=allTopics();
- return '<div class="toolbar"><label class="search">'+ic('search',18)+'<input id="q" type="search" placeholder="Titel, Beschreibung, Tags suchen" value="'+esc(ui.q)+'" autocomplete="off" aria-label="Suche"></label>'+
+ return '<div class="toolbar"><label class="search">'+ic('search',18)+'<input id="q" type="search" placeholder="Suchen: Titel, Inhalt, Tags, Quellen" value="'+esc(ui.q)+'" autocomplete="off" aria-label="Suche"></label>'+
  '<div class="chips" id="stChips"></div>'+
- '<div class="filters"><select class="sel" id="fType" aria-label="Inhaltstyp">'+opts(TYPES,ui.type,'Alle Typen')+'</select><select class="sel" id="fTopic" aria-label="Themengebiet">'+arrOpts(topics,ui.topic,'Alle Themen')+'</select><select class="sel" id="fSort" aria-label="Sortierung"><option value="neu"'+(ui.sort==='neu'?' selected':'')+'>Neueste</option><option value="geaendert"'+(ui.sort==='geaendert'?' selected':'')+'>Geändert</option><option value="titel"'+(ui.sort==='titel'?' selected':'')+'>A bis Z</option></select></div>'+
+ '<div class="filters"><select class="sel" id="fType" aria-label="Inhaltstyp">'+opts(TYPES,ui.type,'Alle Typen')+'</select><select class="sel" id="fTopic" aria-label="Themengebiet">'+arrOpts(topics,ui.topic,'Alle Themen')+'</select><select class="sel" id="fSort" aria-label="Sortierung"><option value="relevanz"'+(ui.sort==='relevanz'?' selected':'')+'>Relevanz</option><option value="neu"'+(ui.sort==='neu'?' selected':'')+'>Neueste</option><option value="geaendert"'+(ui.sort==='geaendert'?' selected':'')+'>Geändert</option><option value="titel"'+(ui.sort==='titel'?' selected':'')+'>A bis Z</option></select></div>'+
  '<div class="resultline"><span id="count"></span><button class="link" data-act="reset-filters">Filter zurücksetzen</button></div></div><div id="list" class="stack"></div>'+
  '<button class="fab" data-act="new-entry" aria-label="Neuer Eintrag">'+ic('plus',22)+'Neu</button>'}
 function paintStChips(){var el=$('#stChips');if(!el)return;var all=[['','Alle']].concat(Object.keys(STATUS).map(function(k){return [k,STATUS[k]]}));el.innerHTML=all.map(function(p){return '<button data-act="f-status" data-v="'+p[0]+'" aria-pressed="'+(ui.status===p[0])+'">'+p[1]+'</button>'}).join('')}
 function paintList(){
- var L=Repo.all('entries').filter(function(e){
-  if(ui.type&&e.type!==ui.type)return false;if(ui.topic&&e.topic!==ui.topic)return false;if(ui.status&&e.status!==ui.status)return false;
-  return !ui.q||matches([e.title,e.description,e.topic,(e.tags||[]).join(' '),TYPES[e.type],STATUS[e.status],e.claimCore,e.reason,e.evidence,e.limits,e.conclusion,linkText('entries',e.id)].join(' '),ui.q)});
- L.sort(function(a,b){return ui.sort==='titel'?a.title.localeCompare(b.title,'de'):ui.sort==='geaendert'?(b.updated||0)-(a.updated||0):(b.created||0)-(a.created||0)});
- $('#list').innerHTML=L.length?L.map(entryCard).join(''):empty(Repo.all('entries').length?'Keine Einträge gefunden. Passe Suche oder Filter an.':'Noch keine Einträge. Tippe auf „Neu“, um den ersten anzulegen.');
- $('#count').textContent=L.length+' von '+Repo.all('entries').length+' Einträgen';paintStChips()}
+ var all=Repo.all('entries'),q=ui.q.trim(),why={},partial=false;
+ var L=all.filter(function(e){
+  if(ui.type&&e.type!==ui.type)return false;if(ui.topic&&e.topic!==ui.topic)return false;if(ui.status&&e.status!==ui.status)return false;return true});
+ if(q){var R=ranked('entries',L,q);L=R.items;why=R.why;partial=R.partial}
+ /* Bei einer Suche mit „Relevanz“ bleibt die Reihenfolge nach Punkten; sonst wie bisher */
+ if(!(q&&ui.sort==='relevanz'))L.sort(function(a,b){return ui.sort==='titel'?a.title.localeCompare(b.title,'de'):ui.sort==='geaendert'?(b.updated||0)-(a.updated||0):(b.created||0)-(a.created||0)});
+ $('#list').innerHTML=L.length?(partial?PARTIAL_NOTE:'')+L.map(function(e){return entryCard(e,why[e.id])}).join(''):empty(all.length?'Keine Einträge gefunden. Passe Suche oder Filter an.':'Noch keine Einträge. Tippe auf „Neu“, um den ersten anzulegen.');
+ $('#count').textContent=(partial?L.length+' Teiltreffer':L.length+' von '+all.length+' Einträgen')+(q&&L.length&&ui.sort==='relevanz'?' · nach Relevanz':'');paintStChips()}
 
 /* ---------- Argumente ---------- */
 function viewArgs(){return '<label class="search">'+ic('search',18)+'<input id="aq" type="search" placeholder="Karten durchsuchen" value="'+esc(ui.aq)+'" autocomplete="off" aria-label="Suche"></label><div id="alist" class="stack"></div><button class="fab" data-act="new-arg" aria-label="Neue Karte">'+ic('plus',22)+'Neu</button>'}
-function paintArgs(){var L=Repo.all('args').filter(function(a){return !ui.aq||matches([a.title,a.claim,a.counter,a.topic,STATUS[a.status],linkText('args',a.id)].join(' '),ui.aq)});
- $('#alist').innerHTML=L.length?L.map(argCard).join(''):empty('Keine Argumentationskarten gefunden.')}
+function paintArgs(){var L=Repo.all('args'),q=ui.aq.trim(),R=q?ranked('args',L,q):{items:L,why:{},partial:false};
+ $('#alist').innerHTML=R.items.length?(R.partial?PARTIAL_NOTE:'')+R.items.map(function(a){return argCard(a,R.why[a.id])}).join(''):empty('Keine Argumentationskarten gefunden.')}
 
 /* ---------- Quellen ---------- */
 function viewSources(){return '<div class="toolbar"><label class="search">'+ic('search',18)+'<input id="sq" type="search" placeholder="Quellen durchsuchen" value="'+esc(ui.sq)+'" autocomplete="off" aria-label="Suche"></label><select class="sel" id="sKind" aria-label="Art">'+arrOpts(SKINDS,ui.skind,'Alle Arten')+'</select></div><div id="slist" class="stack"></div><button class="fab" data-act="new-source" aria-label="Neue Quelle">'+ic('plus',22)+'Neu</button>'}
-function paintSources(){var L=Repo.all('sources').filter(function(s){return (!ui.skind||s.kind===ui.skind)&&(!ui.sq||matches([s.title,s.publisher,s.year,s.kind,s.note].join(' '),ui.sq))});
- $('#slist').innerHTML=L.length?L.map(srcCard).join(''):empty('Keine Quellen gefunden.')}
+function paintSources(){var L=Repo.all('sources').filter(function(s){return !ui.skind||s.kind===ui.skind}),q=ui.sq.trim(),R=q?ranked('sources',L,q):{items:L,why:{},partial:false};
+ $('#slist').innerHTML=R.items.length?(R.partial?PARTIAL_NOTE:'')+R.items.map(function(s){return srcCard(s,R.why[s.id])}).join(''):empty('Keine Quellen gefunden.')}
 
 /* ---------- Diskussionsmodus ---------- */
 function viewDisc(){
@@ -781,12 +832,15 @@ function paintDisc(){
  var q=ui.dq.trim(),el=$('#dres');
  if(!q){el.innerHTML=empty('Gib ein Stichwort ein oder tippe auf einen Tag. Treffer lassen sich mit einem Tipp als Text für X kopieren.')+postsSection();return}
  var ok=function(s){return !ui.donly||s==='belegt'};
- var E=Repo.all('entries').filter(function(e){return ok(e.status)&&matches([e.title,e.description,e.topic,(e.tags||[]).join(' '),e.claimCore,e.reason,e.evidence,e.limits,e.conclusion,linkText('entries',e.id)].join(' '),q)});
- var A=Repo.all('args').filter(function(a){return ok(a.status)&&matches([a.title,a.claim,a.counter,a.topic,linkText('args',a.id)].join(' '),q)});
- var h='';
- if(E.length)h+='<h2>Wissen ('+E.length+')</h2>'+E.map(function(e){return '<article class="card"><div class="meta"><span class="chip">'+esc(TYPES[e.type]||e.type)+'</span>'+stChip(e.status)+'</div><h3>'+esc(e.title)+'</h3><p class="clamp">'+esc(e.description)+'</p><div class="btns" style="margin-top:10px"><button class="btn" data-act="copyx" data-k="entries" data-id="'+esc(e.id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn" data-act="open-entry" data-id="'+esc(e.id)+'">Öffnen</button></div></article>'}).join('');
- if(A.length)h+='<h2>Argumente ('+A.length+')</h2>'+A.map(function(a){return '<article class="card"><div class="meta">'+stChip(a.status)+'</div><h3>'+esc(a.title)+'</h3><div class="cols"><div class="pane con"><small>Gegenargument</small><span class="clamp">'+esc(a.counter)+'</span></div></div><div class="btns" style="margin-top:10px"><button class="btn" data-act="copyx" data-k="args" data-id="'+esc(a.id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn" data-act="open-arg" data-id="'+esc(a.id)+'">Öffnen</button></div></article>'}).join('');
- var P=Repo.all('posts').filter(function(p){return matches([p.text,p.url,p.handle,p.topic,p.note].join(' '),q)});if(P.length)h+='<h2>X-Beiträge ('+P.length+')</h2>'+P.map(postCard).join('');
+ var sE=smartSearch('entries',Repo.all('entries').filter(function(e){return ok(e.status)}),q),sA=smartSearch('args',Repo.all('args').filter(function(a){return ok(a.status)}),q),sP=smartSearch('posts',Repo.all('posts'),q);
+ /* Teiltreffer nur, wenn es in keinem Bereich einen vollständigen Treffer gibt */
+ var partial=!sE.full.length&&!sA.full.length&&!sP.full.length,pick=function(r){return partial?r.partial:r.full};
+ var why={};[sE,sA,sP].forEach(function(r){pick(r).forEach(function(x){why[x.doc.kind+':'+x.doc.id]=x})});
+ var E=pick(sE).map(function(x){return x.doc.item}),A=pick(sA).map(function(x){return x.doc.item}),P=pick(sP).map(function(x){return x.doc.item});
+ var h=partial&&(E.length||A.length||P.length)?PARTIAL_NOTE:'';
+ if(E.length)h+='<h2>Wissen ('+E.length+')</h2>'+E.map(function(e){return '<article class="card"><div class="meta"><span class="chip">'+esc(TYPES[e.type]||e.type)+'</span>'+stChip(e.status)+'</div><h3>'+esc(e.title)+'</h3><p class="clamp">'+esc(e.description)+'</p>'+whyLine(why['entries:'+e.id])+'<div class="btns" style="margin-top:10px"><button class="btn" data-act="copyx" data-k="entries" data-id="'+esc(e.id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn" data-act="open-entry" data-id="'+esc(e.id)+'">Öffnen</button></div></article>'}).join('');
+ if(A.length)h+='<h2>Argumente ('+A.length+')</h2>'+A.map(function(a){return '<article class="card"><div class="meta">'+stChip(a.status)+'</div><h3>'+esc(a.title)+'</h3><div class="cols"><div class="pane con"><small>Gegenargument</small><span class="clamp">'+esc(a.counter)+'</span></div></div>'+whyLine(why['args:'+a.id])+'<div class="btns" style="margin-top:10px"><button class="btn" data-act="copyx" data-k="args" data-id="'+esc(a.id)+'">'+ic('copy',18)+'Für X kopieren</button><button class="btn" data-act="open-arg" data-id="'+esc(a.id)+'">Öffnen</button></div></article>'}).join('');
+ if(P.length)h+='<h2>X-Beiträge ('+P.length+')</h2>'+P.map(function(p){return postCard(p,why['posts:'+p.id])}).join('');
  if(!h)h=empty('Nichts zu „'+esc(q)+'“ gefunden.');
  h+='<button class="btn block" data-act="disc-save">'+ic('plus',18)+'Als neuen Eintrag speichern</button>';
  el.innerHTML=h}
@@ -835,7 +889,7 @@ document.addEventListener('click',function(ev){
   case 'copyx':copy(xText(b.dataset.k,Repo.get(b.dataset.k,id)),'Text für X kopiert');break;
   case 'addtag':var ti=$('#f-tags');ti.value=(ti.value.trim()?ti.value.trim().replace(/,$/,'')+', ':'')+v;b.remove();break;
   case 'f-status':ui.status=v;paintList();break;
-  case 'reset-filters':ui.q=ui.type=ui.topic=ui.status='';ui.sort='neu';render();break;
+  case 'reset-filters':ui.q=ui.type=ui.topic=ui.status='';ui.sort='relevanz';render();break;
   case 'goto-status':ui.status=v;ui.q=ui.type=ui.topic='';location.hash='wissen';if(ui.route==='wissen')render();break;
   case 'disc-only':ui.donly=!ui.donly;b.setAttribute('aria-pressed',ui.donly);paintDisc();break;
   case 'disc-tag':ui.dq=v;$('#dq').value=v;paintDisc();break;
@@ -868,6 +922,8 @@ document.addEventListener('click',function(ev){
   case 'post-entry':closeSheet();postToEntry(id,v);break;
   case 'open-item':openItem(b.dataset.k,id);break;
   case 'new-link':linkForm(null,b.dataset.ck,b.dataset.cid);break;
+  case 'link-related':linkForm(null,b.dataset.ck,b.dataset.cid,v);break;
+  case 'save-syn':var sg=parseSynText($('#syn-text').value);Repo.setSetting('synonyms',sg).then(function(){render();toast(sg.length?sg.length+(sg.length===1?' Gruppe gespeichert':' Gruppen gespeichert'):'Eigene Begriffe entfernt')});break;
   case 'edit-link':linkForm(id,b.dataset.ck,b.dataset.cid);break;
   case 'back-item':openItem(b.dataset.ck,b.dataset.cid);break;
   case 'del-link':if(armed(b,'Löschen?')){var ck=b.dataset.ck,cid=b.dataset.cid;Repo.remove('links',id).then(function(){render();openItem(ck,cid);toast('Verknüpfung gelöscht')})}break;
@@ -903,5 +959,5 @@ Repo.load().then(function(){return Inbox.load()}).then(function(){
  return DB.requestPersist().then(function(p){Repo.persisted=p;if(ui.route==='einstellungen')render()});
 });
 /* Für automatische Tests */
-window.DebateBase={Inbox:Inbox,analyzeShare:analyzeShare,Repo:Repo,checkIntegrity:checkIntegrity,buildExport:buildExport,version:APP_VERSION,pwa:pwa};
+window.DebateBase={docFor:docFor,smartSearch:smartSearch,Inbox:Inbox,analyzeShare:analyzeShare,Repo:Repo,checkIntegrity:checkIntegrity,buildExport:buildExport,version:APP_VERSION,pwa:pwa};
 })();
