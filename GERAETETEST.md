@@ -156,6 +156,15 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] P4 „Ohne KI prüfen“ springt ebenfalls, aber ohne Prompt-Fenster.
 - [ ] P5 „KI-Antwort einfügen“ auf dem Dashboard öffnet das Einfügen-Fenster.
 
+## Q. Screenshot zur KI-Anfrage (ab Version 3.10.0)
+
+- [ ] Q1 Optionen → App: Version 3.10.0.
+- [ ] Q2 Dashboard (KI an): Unter „KI-Anfrage erstellen“ steht „Screenshot? Nach dem Einfügen des Prompts in der KI manuell anhängen.“
+- [ ] Q3 Im Prompt-Fenster steht derselbe Hinweis; im Prompt gibt es den Abschnitt „## Screenshot“ („… falls kein Screenshot angehängt ist, ignoriere diesen Hinweis …“).
+- [ ] Q4 **Mit Screenshot:** Prompt in ChatGPT einfügen, Screenshot anhängen, senden. Antwort in DebateBase einfügen → Vorschau zeigt „Screenshot: von der KI ausgewertet.“ Die Einträge berücksichtigen den Bildinhalt.
+- [ ] Q5 **Ohne Screenshot:** Gleicher Ablauf ohne Bild → Vorschau zeigt „Screenshot: nicht ausgewertet …“. Die KI hat nichts zu einem Bild erfunden.
+- [ ] Q6 Eine ältere KI-Antwort ohne Feld „screenshot“ lässt sich weiterhin einlesen (keine Screenshot-Zeile).
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

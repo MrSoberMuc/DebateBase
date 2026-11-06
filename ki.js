@@ -55,6 +55,9 @@
     L.push(text || '(kein Text angegeben)');
     L.push('"""');
     L.push('');
+    L.push('## Screenshot');
+    L.push('Falls ich einen Screenshot angehängt habe, werte ihn aus und behandle ihn als Originalwortlaut des Beitrags (Text, Zahlen, Grafiken). Weicht er vom Text oben ab oder enthält er mehr, gilt der Screenshot. Falls kein Screenshot angehängt ist, ignoriere diesen Hinweis und erfinde keinen Inhalt dazu.');
+    L.push('');
     L.push('## Meine gespeicherten Einträge');
     if (!E.length && !A.length) L.push('(keine ausgewählt)');
     E.forEach(function (e) {
@@ -94,6 +97,7 @@
     L.push('Erlaubte Werte für "art" bei Verknüpfungen: ' + LINK_TYPES.join(', ') + '. Lesart: "von" <art> "zu", z. B. n1 widerspricht e8.');
     if (opts.sourceKinds && opts.sourceKinds.length) L.push('Erlaubte Werte für "typ" bei Quellen: ' + opts.sourceKinds.join(', ') + '.');
     L.push('Erlaubte Werte für "bewertung" bei Behauptungen: gestützt, widerlegt, umstritten, unklar.');
+    L.push('Im Feld "screenshot" gibst du an, ob du einen angehängten Screenshot ausgewertet hast: true (ja) oder false (kein Screenshot vorhanden).');
     var prompt = L.join('\n');
     return { prompt: prompt, chars: prompt.length, counts: { entries: E.length, args: A.length, sources: S.length }, task: task };
   }
@@ -103,6 +107,7 @@
       debatebase: FORMAT,
       version: FORMAT_VERSION,
       aufgabe: task,
+      screenshot: false,
       zusammenfassung: 'Kurze Einschätzung in 2 bis 4 Sätzen',
       behauptungen: [{ text: 'Eine Behauptung aus dem Text', einordnung: 'überprüfbar', bewertung: 'unklar', belege: ['e6'] }],
       eintraege: [{ ref: 'n1', titel: 'Kurzer Titel', typ: 'fakt', kernaussage: 'Die Aussage in einem Satz', beschreibung: 'Erläuterung mit Einschränkungen', thema: 'Politik', tags: ['Beispiel'], quellen: ['q1'] }],
@@ -174,6 +179,14 @@
   function normUrl(u) { return String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[#?].*$/, '').replace(/\/+$/, ''); }
   function str(v, max) { return typeof v === 'string' || typeof v === 'number' ? clip(String(v), max || 5000) : ''; }
   function list(v) { return Array.isArray(v) ? v : []; }
+  /* Rückmeldung der KI zum Screenshot: true, false oder null (keine Angabe) */
+  function shotFlag(v) {
+    if (v === true || v === false) return v;
+    var s = String(v == null ? '' : v).trim().toLowerCase();
+    if (s === 'true' || s === 'ja') return true;
+    if (s === 'false' || s === 'nein') return false;
+    return null;
+  }
 
   /* ctx = { entries, args, sources (vorhandene Datensätze), sourceKinds, typeLabel } */
   function buildPlan(data, ctx) {
@@ -182,7 +195,7 @@
     (ctx.entries || []).forEach(function (o) { ex.entries[o.id] = o; });
     (ctx.args || []).forEach(function (o) { ex.args[o.id] = o; });
     (ctx.sources || []).forEach(function (o) { ex.sources[o.id] = o; });
-    var kinds = ctx.sourceKinds || [], refs = {}, plan = { task: str(data.aufgabe, 20), summary: str(data.zusammenfassung, 3000), answer: str(data.antwort, 6000), claims: [], entries: [], sources: [], cards: [], links: [], warnings: W };
+    var kinds = ctx.sourceKinds || [], refs = {}, plan = { task: str(data.aufgabe, 20), summary: str(data.zusammenfassung, 3000), answer: str(data.antwort, 6000), screenshot: shotFlag(data.screenshot), claims: [], entries: [], sources: [], cards: [], links: [], warnings: W };
     var take = function (arr, max, label) { arr = list(arr); if (arr.length > max) { W.push(arr.length + ' ' + label + ' geliefert, nur die ersten ' + max + ' werden berücksichtigt.'); arr = arr.slice(0, max); } return arr; };
     var refOk = function (r, prefix, label, i) {
       r = str(r, 40).trim();

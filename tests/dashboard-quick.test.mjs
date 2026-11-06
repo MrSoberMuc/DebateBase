@@ -48,6 +48,31 @@ await test('Mit KI-Erweiterung: „KI-Anfrage erstellen“ analysiert und öffne
   await ctx.close();
 });
 
+await test('3.10.0: Screenshot-Hinweis auf dem Dashboard, im Prompt-Fenster und Rückmeldung in der Vorschau', async () => {
+  const { ctx, page } = await withSample({ permissions: ['clipboard-read', 'clipboard-write'] });
+  assert(await page.locator('#quick-shot').count() === 0, 'kein Hinweis bei KI aus');
+  await go(page, 'einstellungen'); await page.click('[data-act=ki-toggle][data-v=an]'); await page.waitForTimeout(150);
+  await go(page, 'dashboard');
+  assert((await page.textContent('#quick-shot')).includes('Screenshot? Nach dem Einfügen des Prompts in der KI manuell anhängen.'), 'Dashboard-Hinweis');
+  await page.fill('#qtext', 'Sanktionen wirken nie.');
+  await page.click('[data-act=quick-ki]'); await page.waitForTimeout(300);
+  assert(await page.isVisible('#ki-shot') && (await page.inputValue('#ki-prompt')).includes('## Screenshot'), 'Prompt-Fenster');
+  await page.click('#sheet [data-act=ki-imp-open]'); await page.waitForTimeout(150);
+  const shot = async v => {
+    if (await page.locator('#sheet [data-act=ki-imp-reset]').count()) { await page.click('#sheet [data-act=ki-imp-reset]'); await page.waitForTimeout(150); }
+    const d = { debatebase: 'ki-antwort', version: 1, aufgabe: 'pruefen', zusammenfassung: 'Test', eintraege: [{ ref: 'n1', titel: 'Testeintrag Screenshot', typ: 'fakt' }] };
+    if (v !== undefined) d.screenshot = v;
+    await page.fill('#ki-answer', '```json\n' + JSON.stringify(d) + '\n```');
+    await page.click('[data-act=ki-imp-check]'); await page.waitForTimeout(200);
+    return (await page.locator('#ki-shot-res').count()) ? await page.textContent('#ki-shot-res') : '';
+  };
+  assert((await shot(true)).includes('von der KI ausgewertet'), 'true');
+  assert((await shot(false)).includes('nicht ausgewertet'), 'false');
+  assert((await shot(undefined)) === '', 'ohne Angabe keine Zeile');
+  assert(page.errors.length === 0, page.errors.join('; '));
+  await ctx.close();
+});
+
 await test('Leeres Feld: Hinweis, kein Sprung', async () => {
   const { ctx, page } = await withSample();
   await page.click('[data-act=quick-check]');

@@ -36,7 +36,7 @@ Browser und installierte App nutzen **dieselbe Datenbank** auf dem Gerät.
 
 | Bereich | Wofür |
 | --- | --- |
-| **Start** (Dashboard) | **Behauptung prüfen** mit „KI-Anfrage erstellen“ (ab 3.9.0), Überblick, Schnellzugriff, offene Recherchen, Prüfstatus, Hinweise (geteilte Beiträge, Sicherung) |
+| **Start** (Dashboard) | **Behauptung prüfen** mit „KI-Anfrage erstellen“ (ab 3.9.0; Screenshot kann ab 3.10.0 in der KI manuell angehängt werden, der Prompt weist darauf hin), Überblick, Schnellzugriff, offene Recherchen, Prüfstatus, Hinweise (geteilte Beiträge, Sicherung) |
 | **Wissen** | Wissenseinträge (Definition, Fakt, Statistik, Studie, Behauptung, Argument, Gegenargument, Meinung, offene Frage) mit Suche und Filtern |
 | **Argumente** | Argumentationskarten: Behauptung der Gegenseite + Gegenargument |
 | **Quellen** | Belege mit Link, Herausgeber, Jahr; zeigt, wo sie zitiert werden |

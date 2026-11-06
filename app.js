@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.9.0';
+var APP_VERSION='3.10.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -1033,6 +1033,7 @@ function kiSheet(){
  (d.hasExtras?'<label class="checkline"><input type="checkbox" id="ki-keep"'+(d.keep?' checked':'')+'> @-Namen und Links aus dem Text mitschicken</label>':'')+
  '<div class="field"><label for="ki-prompt">Vorschau: genau dieser Text wird kopiert</label><textarea class="mono" id="ki-prompt" readonly>'+esc(P.prompt)+'</textarea><span class="note" id="ki-count">'+P.chars.toLocaleString('de-DE')+' Zeichen</span></div>'+
  '<div class="btns"><button class="btn" data-act="close">Abbrechen</button><button class="btn primary" data-act="ki-copy">'+ic('copy',18)+'Prompt kopieren</button></div>'+
+ '<p class="note" id="ki-shot"><b>Screenshot?</b> Nach dem Einfügen des Prompts in der KI manuell anhängen. Der Prompt weist die KI an, ihn zu beachten, falls vorhanden.</p>'+
  '<p class="note">Bitte die KI, genau im vorgegebenen Format zu antworten. Ihre Antwort fügst du danach hier ein:</p>'+(kiOn()?'<button class="btn block ki-btn" style="margin-top:8px" data-act="ki-imp-open">'+ic('plus',18)+'KI-Antwort einfügen</button>':''))}
 function kiRefresh(){if(!kiDraft)return;var P=kiPrompt(),t=$('#ki-prompt');if(t){t.value=P.prompt;$('#ki-count').textContent=P.chars.toLocaleString('de-DE')+' Zeichen'}
  var h=document.querySelector('#sheet .sec h2');if(h)h.textContent='Mitgeschickte Einträge ('+kiDraft.keys.filter(function(k){return kiDraft.sel[k]}).length+' von '+kiDraft.keys.length+')'}
@@ -1079,7 +1080,8 @@ function kiImpSheet(){
  var chk=function(name,val,on){return '<input type="checkbox" name="'+name+'" value="'+esc(String(val))+'"'+(on?' checked':'')+'>'};
  var h=sheetHead('KI-Antwort: Vorschau','<div class="meta"><span class="chip">KI-Vorschlag</span><span class="chip tag">noch nichts gespeichert</span></div>');
  var pl=function(n,a,b){return n+' '+(n===1?a:b)};
- h+='<div class="card"><b>Gelesen:</b> '+[pl(P.entries.length,'Eintrag','Einträge'),pl(P.sources.length,'Quelle','Quellen'),pl(P.cards.length,'Karte','Karten'),pl(P.links.length,'Verknüpfung','Verknüpfungen')].join(' · ')+'</div>';
+ h+='<div class="card"><b>Gelesen:</b> '+[pl(P.entries.length,'Eintrag','Einträge'),pl(P.sources.length,'Quelle','Quellen'),pl(P.cards.length,'Karte','Karten'),pl(P.links.length,'Verknüpfung','Verknüpfungen')].join(' · ')+
+  (P.screenshot===true?'<p class="note" id="ki-shot-res" style="margin-top:6px">Screenshot: von der KI ausgewertet.</p>':P.screenshot===false?'<p class="note" id="ki-shot-res" style="margin-top:6px">Screenshot: nicht ausgewertet. Falls du einen angehängt hast, ist er bei der KI nicht angekommen.</p>':'')+'</div>';
  if(W.length)h+='<div class="card alert-soft"><b>Hinweise ('+W.length+')</b><ul class="issues">'+W.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul></div>';
  if(P.summary||P.claims.length)h+='<details class="card" id="ki-eval"><summary><b>Einschätzung der KI</b> <span class="chip tag">ungeprüft, wird nicht gespeichert</span></summary>'+(P.summary?'<p class="body" style="margin:8px 0 0">'+esc(P.summary)+'</p>':'')+
   (P.claims.length?'<ul class="claims-ki">'+P.claims.map(function(c){return '<li><span class="body">„'+esc(c.text)+'“</span>'+(c.bewertung?' <span class="chip tag">'+esc(c.bewertung)+'</span>':'')+(c.einordnung?'<small>'+esc(c.einordnung)+'</small>':'')+(c.belege.length?'<small>Belege laut KI: '+esc(c.belege.map(function(b){return kiSrcLabel(b)!==b?kiSrcLabel(b):(Repo.get('entries',b)||Repo.get('args',b)||{title:b}).title}).join('; '))+'</small>':'')+'</li>'}).join('')+'</ul>':'')+'</details>';
@@ -1164,6 +1166,7 @@ function quickCard(){
  '<div class="field"><textarea class="sm" id="qtext" aria-label="Behauptung oder X-Beitrag" placeholder="Behauptung oder X-Beitrag eingeben">'+esc(ui.qtext)+'</textarea></div>'+
  (on?'<button class="btn primary block" data-act="quick-ki">'+ic('copy',18)+'KI-Anfrage erstellen</button>'+
    '<div class="btns"><button class="btn" data-act="quick-check">'+ic('search',18)+'Ohne KI prüfen</button><button class="btn" data-act="ki-imp-open">'+ic('plus',18)+'KI-Antwort einfügen</button></div>'+
+   '<p class="note" id="quick-shot"><b>Screenshot?</b> Nach dem Einfügen des Prompts in der KI manuell anhängen.</p>'+
    '<p class="note">Die App analysiert die Behauptung und bereitet einen Prompt für eine KI deiner Wahl vor. Gesendet wird nichts.</p>'
   :'<button class="btn primary block" data-act="quick-check">'+ic('search',18)+'Behauptung prüfen</button>'+
    '<p class="note">Mit KI-Unterstützung prüfen: <button class="link" data-act="quick-ki-on">KI-Erweiterung einschalten</button></p>')+

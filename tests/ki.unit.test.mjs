@@ -61,5 +61,21 @@ test('Ohne Einträge und ohne Text: trotzdem gültiger Prompt', () => {
   jsonBlock(p);
 });
 
+test('3.10.0: Screenshot-Hinweis im Prompt (falls vorhanden) und Feld „screenshot“ im Format', () => {
+  ['pruefen', 'antwort'].forEach(task => {
+    const p = K.buildPrompt(DATA, { ...opts, task, text: 'x' }).prompt;
+    assert(p.includes('## Screenshot\nFalls ich einen Screenshot angehängt habe') && p.includes('Falls kein Screenshot angehängt ist, ignoriere diesen Hinweis'), 'Hinweis ' + task);
+    assert(p.indexOf('## Screenshot') > p.indexOf('## Text') && p.indexOf('## Screenshot') < p.indexOf('## Meine gespeicherten Einträge'), 'Position');
+    assert(jsonBlock(p).screenshot === false && p.includes('Im Feld "screenshot"'), 'Formatfeld');
+  });
+});
+test('3.10.0: Rückmeldung „screenshot“ wird gelesen; fehlt sie, bleibt alles wie bisher', () => {
+  const plan = d => K.buildPlan(Object.assign({ debatebase: 'ki-antwort', version: 1 }, d), { entries: [], args: [], sources: [] });
+  assert(plan({ screenshot: true }).screenshot === true && plan({ screenshot: 'ja' }).screenshot === true, 'true');
+  assert(plan({ screenshot: false }).screenshot === false && plan({ screenshot: 'false' }).screenshot === false, 'false');
+  assert(plan({}).screenshot === null && plan({ screenshot: 'vielleicht' }).screenshot === null, 'keine Angabe');
+  assert(JSON.stringify(plan({ screenshot: true }).warnings) === JSON.stringify(plan({}).warnings), 'keine neuen Warnungen');
+});
+
 console.log(`\n${n - failed} von ${n} Tests bestanden.`);
 process.exit(failed ? 1 : 0);
