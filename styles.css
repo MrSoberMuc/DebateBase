@@ -249,3 +249,9 @@ details.eval summary{cursor:pointer;padding:2px 0}
 .card.quick textarea{min-height:76px}
 .card.quick .btns{margin:0}
 .card.quick .note{margin:0}
+/* Post für X (3.11.0) */
+.card.post{margin-top:12px}
+.card.post h4{font-size:.9375rem;margin:0 0 6px}
+.card.post textarea{width:100%;font:inherit;line-height:1.5}
+.row.unb-row{border-left:3px solid var(--st-pruefung)}
+.over-note{color:var(--st-widerlegt)}

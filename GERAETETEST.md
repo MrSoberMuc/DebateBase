@@ -165,6 +165,19 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] Q5 **Ohne Screenshot:** Gleicher Ablauf ohne Bild → Vorschau zeigt „Screenshot: nicht ausgewertet …“. Die KI hat nichts zu einem Bild erfunden.
 - [ ] Q6 Eine ältere KI-Antwort ohne Feld „screenshot“ lässt sich weiterhin einlesen (keine Screenshot-Zeile).
 
+## R. Post für X (ab Version 3.11.0)
+
+- [ ] R1 Optionen → App: Version 3.11.0.
+- [ ] R2 Diskussion → **Antwort entwerfen**: „Die EU hat 28 Mitgliedstaaten.“ eingeben → **Passende Einträge vorschlagen**. Der bisherige Entwurf mit Belegen ist unverändert da, darunter die neue Karte **Post für X**.
+- [ ] R3 Post-Art **Antwort**: Der Text beginnt direkt mit der Kernaussage. Der Zähler zeigt „… / 280 Zeichen“.
+- [ ] R4 Post-Art **Eigener Post**: Der Text beginnt mit „Oft heißt es: „Die EU hat 28 Mitgliedstaaten““ und hat Absätze.
+- [ ] R5 Post-Art **Zitat-Post**: ohne Einleitung, kurz.
+- [ ] R6 Abschluss **Rückfrage**: Antwort endet mit „Worauf stützt du deine Aussage?“, eigener Post mit „Welche Quellen kennt ihr dazu?“.
+- [ ] R7 Unter **Aufbau** steht für jeden Teil, woher er kommt (z. B. „Kernaussage · aus [1] …“).
+- [ ] R8 Text im Feld bearbeiten: Der Zähler ändert sich sofort. Ein Link zählt immer 23 Zeichen. Über 280 wird der Zähler rot, und „Zu lang für X“ erscheint.
+- [ ] R9 **Post kopieren** → in X einfügen: genau dein (bearbeiteter) Text. **Neu erzeugen** stellt den automatischen Text wieder her.
+- [ ] R10 Nichts davon wird gespeichert (Anzahl der Einträge bleibt gleich).
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

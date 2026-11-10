@@ -103,6 +103,16 @@ Unter **Diskussion → Antwort entwerfen** entsteht ein Antwortentwurf **nur aus
 
 Es entstehen keine neuen Fakten. Nur Überleitungen und der Einleitungssatz kommen aus festen Vorlagen. Der Entwurf wird nicht gespeichert. Prüfe und bearbeite ihn vor dem Posten.
 
+### Post für X (ab Version 3.11.0)
+
+Unter dem Antwortentwurf gibt es die Karte **Post für X**. Sie baut einen sachlichen Post nach dem Muster **Kernaussage → Beleg → Abschluss**, höchstens 280 Zeichen:
+
+- **Post-Art:** Antwort (direkt zur Sache), Eigener Post (mit Einleitung „Oft heißt es: …“, verständlich ohne Vorwissen) oder Zitat-Post (kurz).
+- **Kernaussage** kommt aus dem wichtigsten gewählten Eintrag, der **Beleg** aus dessen Feld „Evidenz“ oder aus dem nächsten (belegten) Eintrag.
+- **Abschluss:** keiner, eine feste Rückfrage oder die Schlussfolgerung eines Eintrags.
+- Ist der Text zu lang, wird erst Einleitung/Abschluss weggelassen, dann der Beleg gekürzt. Die App sagt dir jeweils, was sie gekürzt hat.
+- Der Text ist frei bearbeitbar. Der Zähler rechnet wie X (Links = 23 Zeichen, Emojis doppelt). **Post kopieren** kopiert genau den Text im Feld.
+
 ### KI-Auftrag kopieren (optional, ab Version 3.6.0)
 
 Unter **Optionen → KI-Erweiterung** einschalten (standardmäßig aus). Danach gibt es in **Behauptung prüfen** und **Antwort entwerfen** den Knopf **KI-Auftrag erstellen**:

@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.10.0';
+var APP_VERSION='3.11.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -174,7 +174,7 @@ function checkIntegrity(){
  return iss}
 
 /* ---------- Hilfen ---------- */
-var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,dmode:'suche',ctext:'',cpost:'',cres:null,rclaim:'',rsel:[],rrel:{},rstyle:'sachlich',rq:'',qtext:'',pendingKi:false,focusImport:false};
+var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,dmode:'suche',ctext:'',cpost:'',cres:null,rclaim:'',rsel:[],rrel:{},rstyle:'sachlich',rq:'',ptype:'antwort',pclose:'keiner',ptext:null,qtext:'',pendingKi:false,focusImport:false};
 var ROUTES=[['dashboard','Dashboard','Start','home','Übersicht über deine Wissensdatenbank'],['wissen','Wissensbibliothek','Wissen','book','Fakten, Definitionen, Studien und mehr'],['argumente','Argumentationsarchiv','Argumente','scale','Behauptungen mit Gegenargumenten'],['quellen','Quellenarchiv','Quellen','doc','Belege und Fundstellen'],['diskussion','Diskussionsmodus','Diskussion','chat','Schnell nachschlagen und kopieren'],['einstellungen','Einstellungen','Optionen','sliders','Darstellung und Daten']];
 function norm(s){return String(s||'').toLowerCase()}
 function matches(hay,q){var ts=norm(q).split(/\s+/).filter(Boolean),h=norm(hay);return ts.every(function(t){return h.indexOf(t)>=0})}
@@ -941,7 +941,7 @@ function replyKey(k,id){return k+':'+id}
 function replySplit(key){var i=key.indexOf(':');return [key.slice(0,i),key.slice(i+1)]}
 function replyItems(){
  return ui.rsel.map(function(key){var p=replySplit(key),o=Repo.get(p[0],p[1]);if(!o)return null;
-  return {kind:p[0],id:o.id,title:o.title,type:o.type,status:o.status,claimCore:o.claimCore,description:o.description,counter:o.counter,rel:ui.rrel[key]||'ergaenzend',
+  return {kind:p[0],id:o.id,title:o.title,type:o.type,status:o.status,claimCore:o.claimCore,description:o.description,counter:o.counter,evidence:o.evidence,conclusion:o.conclusion,rel:ui.rrel[key]||'ergaenzend',
    sources:(o.sourceIds||[]).map(function(s){return Repo.get('sources',s)}).filter(Boolean).map(function(s){return {id:s.id,title:s.title,publisher:s.publisher,year:s.year,url:s.url}})}}).filter(Boolean)}
 function viewReply(){
  return '<div class="card hint-rules"><p><b>Entwürfe nur aus deinen gespeicherten Einträgen und Quellen.</b> Keine KI, keine neuen Fakten. Jeder Satz trägt eine Belegnummer; nicht belegte Sätze sind markiert. Prüfe und bearbeite den Entwurf vor dem Posten.</p></div>'+
@@ -978,7 +978,30 @@ function paintDraft(){
  '<div class="btns" style="margin-top:10px"><button class="btn" data-act="reply-copy">'+ic('copy',18)+'Mit Belegen kopieren</button><button class="btn primary" data-act="reply-copyx">'+ic('copy',18)+'Für X kopieren</button></div></article>'+
  '<div class="sec"><h2>Belege im Entwurf ('+d.refs.length+')</h2>'+d.refs.map(function(r){
   return '<button class="row" data-act="open-item" data-k="'+r.kind+'" data-id="'+esc(r.id)+'"><div><b>['+r.n+'] '+esc(r.title)+'</b><small>Text aus: '+esc(r.from)+(r.label?' · '+esc(r.label):'')+'</small></div>'+stChip(r.status)+'</button>'+
-  r.sources.map(function(s){return '<button class="row sub" data-act="open-source" data-id="'+esc(s.id)+'"><div><small>Quelle zu ['+r.n+']</small><b>'+esc(s.title)+'</b><small>'+esc([s.publisher,s.year].filter(Boolean).join(', '))+'</small></div></button>'}).join('')}).join('')+'</div>'}
+  r.sources.map(function(s){return '<button class="row sub" data-act="open-source" data-id="'+esc(s.id)+'"><div><small>Quelle zu ['+r.n+']</small><b>'+esc(s.title)+'</b><small>'+esc([s.publisher,s.year].filter(Boolean).join(', '))+'</small></div></button>'}).join('')}).join('')+'</div>'+xPostCard()}
+
+/* ---------- Post für X (Phase 5, Etappe 1) ----------
+ * Sachlicher Post nach dem Muster Kernaussage → Beleg → Abschluss,
+ * höchstens 280 Zeichen. Inhalte nur aus gespeicherten Einträgen
+ * (analyse.js: buildPost). Der Text ist frei bearbeitbar; nichts wird gespeichert. */
+function currentPost(){var items=replyItems();if(!items.length)return null;return Analyse.buildPost({type:ui.ptype,close:ui.pclose,claim:ui.rclaim,items:items,statusLabel:function(s){return STATUS[s]||s}})}
+function pcountHtml(n){return n+' / '+Analyse.X_MAX+' Zeichen'}
+function xPostCard(){
+ var p=currentPost();if(!p||!p.parts.length)return '';
+ var text=ui.ptext!=null?ui.ptext:p.text,n=Analyse.xLength(text),edited=ui.ptext!=null;
+ return '<article class="card post" id="post"><h3>Post für X</h3>'+
+ '<p class="note">Sachlich aufgebaut: Kernaussage → Beleg → Abschluss. Höchstens '+Analyse.X_MAX+' Zeichen.</p>'+
+ '<div class="field"><label>Post-Art</label><div class="seg" id="ptype">'+Object.keys(Analyse.POST_TYPES).map(function(k){return '<button data-act="post-type" data-v="'+k+'" aria-pressed="'+(ui.ptype===k)+'">'+esc(Analyse.POST_TYPES[k])+'</button>'}).join('')+'</div></div>'+
+ '<div class="field"><label for="pclose">Abschluss</label><select id="pclose">'+opts(Analyse.POST_CLOSE,ui.pclose)+'</select></div>'+
+ '<div class="field"><label for="ptext">Text (bearbeitbar)</label><textarea id="ptext" rows="6">'+esc(text)+'</textarea></div>'+
+ '<div class="meta"><span class="chip tag'+(n>Analyse.X_MAX?' over':'')+'" id="pcount">'+pcountHtml(n)+'</span>'+(p.unsupported?'<span class="chip unb-chip">'+p.unsupported+(p.unsupported===1?' Teil nicht belegt':' Teile nicht belegt')+'</span>':'')+(edited?'<span class="chip">bearbeitet</span>':'')+'</div>'+
+ '<p class="note over-note" id="pover"'+(n>Analyse.X_MAX?'':' hidden')+'>Zu lang für X. Bitte kürzen.</p>'+
+ (edited?'<p class="note">Du hast den Text bearbeitet. Änderungen an Einträgen, Post-Art oder Abschluss wirken erst nach „Neu erzeugen“.</p>':'')+
+ p.notes.map(function(x){return '<p class="note">'+esc(x)+'</p>'}).join('')+
+ '<div class="btns" style="margin-top:10px"><button class="btn" data-act="post-reset">Neu erzeugen</button><button class="btn primary" data-act="post-copy">'+ic('copy',18)+'Post kopieren</button></div>'+
+ '<h4 style="margin-top:14px">Aufbau</h4><div class="stack">'+p.parts.map(function(x){
+  return '<div class="row'+(x.ok?'':' unb-row')+'"><div><small>'+esc(x.roleLabel)+(x.n?' · aus ['+x.n+'] '+esc(p.refs[x.n-1].title)+' ('+esc(x.from)+')':' · feste Vorlage')+(x.cut?' · gekürzt':'')+(x.label?' · '+esc(x.label):'')+'</small><b>'+esc(x.text)+'</b></div></div>'}).join('')+'</div></article>'}
+function paintPostCount(){var t=$('#ptext');if(!t)return;var n=Analyse.xLength(t.value),c=$('#pcount');if(c){c.textContent=pcountHtml(n);c.classList.toggle('over',n>Analyse.X_MAX)}var o=$('#pover');if(o)o.hidden=n<=Analyse.X_MAX}
 function suggestReply(){
  var t=String(ui.rclaim||'').trim();if(!t){toast('Bitte zuerst eingeben, worauf du antwortest');return}
  var R=Analyse.relate(t,Repo.db,{synIndex:synIdx(),ltypes:LTYPES,statusLabel:function(s){return STATUS[s]||s},typeLabel:function(x){return TYPES[x]||x}});
@@ -1261,6 +1284,9 @@ document.addEventListener('click',function(ev){
   case 'reply-style':ui.rstyle=v;document.querySelectorAll('#rstyle button').forEach(function(x){x.setAttribute('aria-pressed',x.dataset.v===v)});paintDraft();break;
   case 'reply-copy':var dr=currentDraft();if(dr)copy(dr.full,'Entwurf mit Belegen kopiert');break;
   case 'reply-copyx':var dx=currentDraft();if(dx)copy(dx.x,dx.unsupported?'Kopiert. Achtung: enthält nicht belegte Aussagen':'Text für X kopiert');break;
+  case 'post-type':ui.ptype=Analyse.POST_TYPES[v]?v:'antwort';ui.ptext=null;paintDraft();break;
+  case 'post-reset':ui.ptext=null;paintDraft();break;
+  case 'post-copy':var pt=$('#ptext'),pv=pt?pt.value:'',pn=Analyse.xLength(pv),pp=currentPost();if(!pv.trim()){toast('Der Post ist leer');break}copy(pv,pn>Analyse.X_MAX?'Kopiert. Achtung: '+pn+' Zeichen, länger als 280':(pp&&pp.unsupported&&ui.ptext==null?'Kopiert. Achtung: enthält nicht belegte Teile':'Post kopiert'));break;
   case 'check-reply':replyFromClaim(v);break;
   case 'ki-start':if(v==='antwort'){var rc=$('#rclaim');if(rc)ui.rclaim=rc.value}kiStart(v==='antwort'?'antwort':'pruefen');break;
   case 'ki-copy':kiCopy();break;
@@ -1320,10 +1346,10 @@ document.addEventListener('keydown',function(ev){
  if(ev.key==='Escape'&&!$('#overlay').hidden){closeSheet();return}
  if((ev.key==='Enter'||ev.key===' ')&&ev.target.getAttribute&&ev.target.getAttribute('role')==='button'){ev.preventDefault();ev.target.click()}});
 document.addEventListener('input',function(ev){var i=ev.target.id;
- if(i==='qtext'){ui.qtext=ev.target.value}else if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}else if(i==='ctext'){ui.ctext=ev.target.value}else if(i==='rclaim'){ui.rclaim=ev.target.value;paintDraft()}else if(i==='rq'){ui.rq=ev.target.value;paintReplyAdd()}else if(i==='ki-answer'){kiImp.text=ev.target.value}});
+ if(i==='qtext'){ui.qtext=ev.target.value}else if(i==='q'){ui.q=ev.target.value;paintList()}else if(i==='aq'){ui.aq=ev.target.value;paintArgs()}else if(i==='sq'){ui.sq=ev.target.value;paintSources()}else if(i==='dq'){ui.dq=ev.target.value;paintDisc()}else if(i==='ctext'){ui.ctext=ev.target.value}else if(i==='rclaim'){ui.rclaim=ev.target.value;paintDraft()}else if(i==='rq'){ui.rq=ev.target.value;paintReplyAdd()}else if(i==='ptext'){ui.ptext=ev.target.value;paintPostCount()}else if(i==='ki-answer'){kiImp.text=ev.target.value}});
 document.addEventListener('change',function(ev){var i=ev.target.id,v=ev.target.value;
  if(kiImpChange(ev.target))return;
- if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}else if(i==='s-coi'){var cf=$('#s-conflicts-f');if(cf)cf.hidden=v!=='ja'}
+ if(i==='fType'){ui.type=v;paintList()}else if(i==='fTopic'){ui.topic=v;paintList()}else if(i==='fSort'){ui.sort=v;paintList()}else if(i==='sKind'){ui.skind=v;paintSources()}else if(i==='pclose'){ui.pclose=Analyse.POST_CLOSE[v]?v:'keiner';ui.ptext=null;paintDraft()}else if(i==='s-coi'){var cf=$('#s-conflicts-f');if(cf)cf.hidden=v!=='ja'}
  else if(i==='mig-file'&&ev.target.files[0]){var fl=ev.target.files[0],r=new FileReader();r.onload=function(){mig.text=String(r.result);mig.fileName=fl.name+' ('+Math.round(fl.size/1024)+' KB)';mig.error='';migRender()};r.onerror=function(){mig.error='Die Datei konnte nicht gelesen werden.';migRender()};r.readAsText(fl)}
  else if(ev.target.name==='ki-item'&&kiDraft){kiDraft.sel[v]=ev.target.checked;kiRefresh()}else if(i==='ki-keep'&&kiDraft){kiDraft.keep=ev.target.checked;kiRefresh()}
  else if(ev.target.name==='mig-mode'){mig.mode=v;migRender(true)}else if(ev.target.name==='mig-conflict'){mig.conflict=v;migRender(true)}});

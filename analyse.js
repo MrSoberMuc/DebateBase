@@ -829,6 +829,107 @@
       full: full, x: x || '', chars: (x || '').length, unsupported: useParts.filter(function (p) { return !p.ok; }).length };
   }
 
+  /* =====================================================================
+   * Post-Formate für X (Phase 5, Etappe 1)
+   * Baut einen sachlichen Post nach dem Muster
+   *   Kernaussage → Beleg → Abschluss (optional)
+   * für die Post-Arten Antwort, eigener Post und Zitat-Post.
+   * Wie beim Antwortassistenten stammen alle inhaltlichen Sätze aus
+   * gespeicherten Texten; nur Einleitung und Rückfrage sind feste Vorlagen.
+   * Ziel: höchstens 280 Zeichen (kein X Premium).
+   * ===================================================================== */
+  var POST_TYPES = { antwort: 'Antwort', eigen: 'Eigener Post', zitat: 'Zitat-Post' };
+  var POST_CLOSE = { keiner: 'Kein Abschluss', frage: 'Rückfrage', schluss: 'Schlussfolgerung' };
+  var X_MAX = 280, X_URL = 23;
+  var URL_RE = /(?:https?:\/\/|www\.)[^\s]+/gi;
+  var WIDE_RE = /[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]|\p{Extended_Pictographic}/u;
+  /* Zählt ungefähr wie X: Links immer 23 Zeichen, Emojis und
+     ostasiatische Schriftzeichen doppelt, Verbinder unsichtbar. */
+  function xLength(t) {
+    var n = 0;
+    t = String(t || '').replace(URL_RE, function () { n += X_URL; return ''; });
+    Array.from(t).forEach(function (c) {
+      if (c === '‍' || c === '️' || c === '︎') return;
+      n += WIDE_RE.test(c) ? 2 : 1;
+    });
+    return n;
+  }
+  function noEnd(t) { return String(t || '').trim().replace(/[.!?…:;,]+$/, ''); }
+
+  /* input: { type, claim, items (wie draftReply, zusätzlich evidence, conclusion), close, statusLabel }
+     Liefert { type, typeLabel, text, chars, parts: [{ role, roleLabel, text, n, ok, label }], refs, notes, unsupported } */
+  function buildPost(input) {
+    var SL = input.statusLabel;
+    var type = POST_TYPES[input.type] ? input.type : 'antwort';
+    var close = POST_CLOSE[input.close] ? input.close : 'keiner';
+    var items = (input.items || []).slice().sort(function (a, b) { return (REL_RANK[a.rel] == null ? 3 : REL_RANK[a.rel]) - (REL_RANK[b.rel] == null ? 3 : REL_RANK[b.rel]); });
+    var notes = [];
+    var cand = [];
+    items.forEach(function (it) {
+      var c = coreOf(it, SL), b = backing(it, SL);
+      if (String(c.text).trim()) cand.push({ it: it, text: endDot(c.pre + c.text), ok: b.ok, label: b.label, from: c.from });
+    });
+    var res = { type: type, typeLabel: POST_TYPES[type], text: '', chars: 0, parts: [], refs: [], notes: notes, unsupported: 0 };
+    if (!cand.length) return res;
+
+    /* Kernaussage: der wichtigste Datensatz (Widerspruch vor Relativierung vor Unterstützung) */
+    var kern = cand[0];
+    /* Beleg: zuerst das Feld „Evidenz“ desselben Eintrags, sonst der nächste – belegte bevorzugt */
+    var beleg = null;
+    var ev = firstSentences(kern.it.evidence, 1);
+    if (ev) beleg = { it: kern.it, text: endDot(ev), ok: kern.ok, label: kern.label, from: 'Evidenz' };
+    else {
+      var rest = cand.slice(1);
+      var pick = rest.filter(function (c) { return c.ok; })[0] || rest[0];
+      if (pick) beleg = pick;
+    }
+    /* Abschluss */
+    var abschluss = null;
+    if (close === 'frage') {
+      abschluss = { text: type === 'antwort' ? 'Worauf stützt du deine Aussage?' : 'Welche Quellen kennt ihr dazu?', tpl: true };
+    } else if (close === 'schluss') {
+      var withC = items.filter(function (it) { return String(it.conclusion || '').trim(); })[0];
+      if (withC) {
+        var b2 = backing(withC, SL);
+        abschluss = { it: withC, text: endDot(firstSentences(withC.conclusion, 1)), ok: b2.ok, label: b2.label, from: 'Schlussfolgerung' };
+      } else notes.push('Keiner der gewählten Einträge hat eine Schlussfolgerung. Der Post endet ohne Abschluss.');
+    }
+    /* Einleitung nur beim eigenen Post: er muss ohne Vorwissen verständlich sein */
+    var claim = String(input.claim || '').replace(/\s+/g, ' ').trim();
+    var intro = null;
+    if (type === 'eigen' && claim) intro = { text: 'Oft heißt es: „' + noEnd(clip(claim, 100)) + '“', tpl: true };
+
+    var sep = type === 'eigen' ? '\n\n' : ' ';
+    var compose = function () { return [intro, kern, beleg, abschluss].filter(Boolean).map(function (p) { return p.text; }).join(sep); };
+    var fits = function () { return xLength(compose()) <= X_MAX; };
+    /* Kürzen: Einleitung, dann Abschluss weglassen, dann Beleg kürzen/weglassen, zuletzt Kernaussage kürzen */
+    if (!fits() && intro) { intro = null; notes.push('Einleitung weggelassen, damit der Post in 280 Zeichen passt.'); }
+    if (!fits() && abschluss) { abschluss = null; notes.push('Abschluss weggelassen, damit der Post in 280 Zeichen passt.'); }
+    if (!fits() && beleg) {
+      var roomB = X_MAX - xLength(kern.text) - sep.length;
+      if (roomB >= 60) { beleg = Object.assign({}, beleg, { text: clip(beleg.text, roomB), cut: true }); notes.push('Beleg gekürzt (…). Bitte prüfen, ob der Sinn erhalten bleibt.'); }
+      else { beleg = null; notes.push('Beleg weggelassen, weil die Kernaussage allein schon fast 280 Zeichen hat.'); }
+    }
+    if (!fits()) { kern = Object.assign({}, kern, { text: clip(kern.text, X_MAX - (beleg ? xLength(beleg.text) + sep.length : 0)), cut: true }); notes.push('Kernaussage gekürzt (…). Bitte prüfen, ob der Sinn erhalten bleibt.'); }
+
+    var ROLE = { einleitung: 'Einleitung', kern: 'Kernaussage', beleg: 'Beleg', abschluss: 'Abschluss' };
+    var refIdx = {};
+    var refOf = function (it) {
+      var key = it.kind + ':' + it.id;
+      if (!refIdx[key]) { var b = backing(it, SL); refIdx[key] = { n: res.refs.length + 1, kind: it.kind, id: it.id, title: it.title, status: it.status, ok: b.ok, label: b.label, sources: it.sources || [] }; res.refs.push(refIdx[key]); }
+      return refIdx[key];
+    };
+    [['einleitung', intro], ['kern', kern], ['beleg', beleg], ['abschluss', abschluss]].forEach(function (x) {
+      var p = x[1]; if (!p) return;
+      var r = p.it ? refOf(p.it) : null;
+      res.parts.push({ role: x[0], roleLabel: ROLE[x[0]], text: p.text, n: r ? r.n : null, from: p.from || 'Vorlage', ok: p.tpl ? true : p.ok, label: p.tpl ? '' : p.label, tpl: !!p.tpl, cut: !!p.cut });
+    });
+    res.text = compose();
+    res.chars = xLength(res.text);
+    res.unsupported = res.parts.filter(function (p) { return !p.ok; }).length;
+    return res;
+  }
+
   global.Analyse = {
     normalize: normalize,
     words: words,
@@ -852,6 +953,11 @@
     REL_ORDER: REL_ORDER,
     REL_LABEL: REL_LABEL,
     draftReply: draftReply,
-    STYLES: STYLES
+    STYLES: STYLES,
+    buildPost: buildPost,
+    xLength: xLength,
+    POST_TYPES: POST_TYPES,
+    POST_CLOSE: POST_CLOSE,
+    X_MAX: X_MAX
   };
 })(typeof self !== 'undefined' ? self : this);
