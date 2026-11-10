@@ -856,6 +856,23 @@
   }
   function noEnd(t) { return String(t || '').trim().replace(/[.!?…:;,]+$/, ''); }
 
+  /* Prüfstatus im Post (Phase 5, Etappe 2)
+     Behauptungen/Meinungen mit Status widerlegt, veraltet oder umstritten
+     formuliert coreOf bereits als Widerlegung bzw. offene Frage. Für alle
+     anderen Einträge gilt: */
+  var HEDGE = { teilweise: 'Nach bisherigen Belegen spricht einiges dafür: ', umstritten: 'Nicht abschließend geklärt, aber: ', veraltet: 'Nach älterem Stand: ' };
+  function isClaimLike(it) { return it.kind !== 'args' && (it.type === 'behauptung' || it.type === 'meinung'); }
+  function refutes(it) { return isClaimLike(it) && (it.status === 'widerlegt' || it.status === 'veraltet' || it.status === 'umstritten'); }
+  /* Warnung zu einem Datensatz; null = unbedenklich */
+  function statusWarning(it, SL, hedged) {
+    var st = SL ? SL(it.status) : it.status;
+    if (refutes(it)) return null;
+    if (it.status === 'widerlegt') return { level: 'stop', text: 'ist widerlegt und wird nicht als Argument verwendet.' };
+    if (HEDGE[it.status]) return { level: 'hedge', text: 'hat den Status „' + st + '“' + (hedged ? ' und ist vorsichtig formuliert.' : '. Vorsichtige Formulierung ist ausgeschaltet.') };
+    if (it.status === 'neu' || it.status === 'pruefung') return { level: 'check', text: 'ist noch nicht geprüft (Status „' + st + '“). Vor dem Posten prüfen.' };
+    return null;
+  }
+
   /* input: { type, claim, items (wie draftReply, zusätzlich evidence, conclusion), close, statusLabel }
      Liefert { type, typeLabel, text, chars, parts: [{ role, roleLabel, text, n, ok, label }], refs, notes, unsupported } */
   function buildPost(input) {
@@ -863,14 +880,17 @@
     var type = POST_TYPES[input.type] ? input.type : 'antwort';
     var close = POST_CLOSE[input.close] ? input.close : 'keiner';
     var items = (input.items || []).slice().sort(function (a, b) { return (REL_RANK[a.rel] == null ? 3 : REL_RANK[a.rel]) - (REL_RANK[b.rel] == null ? 3 : REL_RANK[b.rel]); });
-    var notes = [];
+    var notes = [], warnings = [];
+    var hedgeOn = input.hedge !== false;
+    var hedgeOf = function (it) { return hedgeOn && !refutes(it) && HEDGE[it.status] ? HEDGE[it.status] : ''; };
     var cand = [];
     items.forEach(function (it) {
+      if (!refutes(it) && it.status === 'widerlegt') { warnings.push({ id: it.id, kind: it.kind, title: it.title, status: it.status, level: 'stop', text: statusWarning(it, SL, hedgeOn).text }); return; }
       var c = coreOf(it, SL), b = backing(it, SL);
-      if (String(c.text).trim()) cand.push({ it: it, text: endDot(c.pre + c.text), ok: b.ok, label: b.label, from: c.from });
+      if (String(c.text).trim()) cand.push({ it: it, text: endDot(hedgeOf(it) + c.pre + c.text), ok: b.ok, label: b.label, from: c.from, hedged: !!hedgeOf(it) });
     });
-    var res = { type: type, typeLabel: POST_TYPES[type], text: '', chars: 0, parts: [], refs: [], notes: notes, unsupported: 0 };
-    if (!cand.length) return res;
+    var res = { type: type, typeLabel: POST_TYPES[type], text: '', chars: 0, parts: [], refs: [], notes: notes, warnings: warnings, unsupported: 0 };
+    if (!cand.length) { if (warnings.length) notes.push('Kein verwendbarer Eintrag: Widerlegte Inhalte werden nicht als Argument verwendet.'); return res; }
 
     /* Kernaussage: der wichtigste Datensatz (Widerspruch vor Relativierung vor Unterstützung) */
     var kern = cand[0];
@@ -888,10 +908,10 @@
     if (close === 'frage') {
       abschluss = { text: type === 'antwort' ? 'Worauf stützt du deine Aussage?' : 'Welche Quellen kennt ihr dazu?', tpl: true };
     } else if (close === 'schluss') {
-      var withC = items.filter(function (it) { return String(it.conclusion || '').trim(); })[0];
+      var withC = cand.map(function (c) { return c.it; }).filter(function (it) { return String(it.conclusion || '').trim(); })[0];
       if (withC) {
-        var b2 = backing(withC, SL);
-        abschluss = { it: withC, text: endDot(firstSentences(withC.conclusion, 1)), ok: b2.ok, label: b2.label, from: 'Schlussfolgerung' };
+        var b2 = backing(withC, SL), sameAsKern = withC === kern.it;
+        abschluss = { it: withC, text: endDot((sameAsKern ? '' : hedgeOf(withC)) + firstSentences(withC.conclusion, 1)), ok: b2.ok, label: b2.label, from: 'Schlussfolgerung', hedged: !sameAsKern && !!hedgeOf(withC) };
       } else notes.push('Keiner der gewählten Einträge hat eine Schlussfolgerung. Der Post endet ohne Abschluss.');
     }
     /* Einleitung nur beim eigenen Post: er muss ohne Vorwissen verständlich sein */
@@ -922,11 +942,56 @@
     [['einleitung', intro], ['kern', kern], ['beleg', beleg], ['abschluss', abschluss]].forEach(function (x) {
       var p = x[1]; if (!p) return;
       var r = p.it ? refOf(p.it) : null;
-      res.parts.push({ role: x[0], roleLabel: ROLE[x[0]], text: p.text, n: r ? r.n : null, from: p.from || 'Vorlage', ok: p.tpl ? true : p.ok, label: p.tpl ? '' : p.label, tpl: !!p.tpl, cut: !!p.cut });
+      res.parts.push({ role: x[0], roleLabel: ROLE[x[0]], text: p.text, n: r ? r.n : null, from: p.from || 'Vorlage', ok: p.tpl ? true : p.ok, label: p.tpl ? '' : p.label, tpl: !!p.tpl, cut: !!p.cut, hedged: !!p.hedged });
     });
+    /* Warnungen zu den tatsächlich verwendeten Einträgen */
+    res.refs.forEach(function (r) {
+      var it = items.filter(function (x) { return x.kind === r.kind && x.id === r.id; })[0];
+      var w = it && statusWarning(it, SL, hedgeOn);
+      if (w) warnings.push({ id: r.id, kind: r.kind, n: r.n, title: r.title, status: r.status, level: w.level, text: w.text });
+    });
+    res.follow = buildFollowUp(res.refs);
     res.text = compose();
     res.chars = xLength(res.text);
     res.unsupported = res.parts.filter(function (p) { return !p.ok; }).length;
+    return res;
+  }
+
+  /* Quellen als eigene Folgeantwort (Phase 5, Etappe 2)
+     Der Post selbst bleibt ohne Link; die Quellen der verwendeten Einträge
+     kommen in eine zweite Antwort, ebenfalls höchstens 280 Zeichen. */
+  function buildFollowUp(refs) {
+    var seen = {}, src = [];
+    (refs || []).forEach(function (r) { (r.sources || []).forEach(function (s) {
+      var k = s.id || (s.title + '|' + (s.url || ''));
+      if (!seen[k] && (s.title || s.url)) { seen[k] = 1; src.push(s); }
+    }); });
+    var res = { text: '', chars: 0, sources: src, used: 0, notes: [] };
+    if (!src.length) return res;
+    var line = function (s, tmax, withPub) {
+      var meta = [withPub ? s.publisher : '', s.year].filter(Boolean).join(', ');
+      var t = s.title ? clip(s.title, tmax) : '';
+      return [t + (meta ? (t ? ' (' + meta + ')' : meta) : ''), s.url || ''].filter(Boolean).join(' ');
+    };
+    var make = function (list, tmax, withPub) {
+      return list.length === 1 ? 'Quelle: ' + line(list[0], tmax, withPub)
+        : 'Quellen:\n' + list.map(function (s) { return '• ' + line(s, tmax, withPub); }).join('\n');
+    };
+    var steps = [[200, true], [70, true], [45, false], [30, false]];
+    for (var cnt = src.length; cnt >= 1; cnt--) {
+      var list = src.slice(0, cnt);
+      for (var i = 0; i < steps.length; i++) {
+        var t = make(list, steps[i][0], steps[i][1]);
+        if (xLength(t) <= X_MAX) {
+          res.text = t; res.chars = xLength(t); res.used = cnt;
+          if (i > 0) res.notes.push('Titel gekürzt' + (steps[i][1] ? '' : ' und Herausgeber weggelassen') + ', damit die Folgeantwort in 280 Zeichen passt.');
+          if (cnt < src.length) res.notes.push((src.length - cnt) + (src.length - cnt === 1 ? ' Quelle passt' : ' Quellen passen') + ' nicht mehr hinein: ' + src.slice(cnt).map(function (s) { return s.title || s.url; }).join('; ') + '.');
+          return res;
+        }
+      }
+    }
+    var one = clip(make([src[0]], 30, false), X_MAX);
+    res.text = one; res.chars = xLength(one); res.used = 1; res.notes.push('Folgeantwort stark gekürzt. Bitte prüfen.');
     return res;
   }
 
@@ -956,6 +1021,7 @@
     STYLES: STYLES,
     buildPost: buildPost,
     xLength: xLength,
+    buildFollowUp: buildFollowUp,
     POST_TYPES: POST_TYPES,
     POST_CLOSE: POST_CLOSE,
     X_MAX: X_MAX

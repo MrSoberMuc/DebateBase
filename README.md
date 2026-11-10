@@ -113,6 +113,11 @@ Unter dem Antwortentwurf gibt es die Karte **Post für X**. Sie baut einen sachl
 - Ist der Text zu lang, wird erst Einleitung/Abschluss weggelassen, dann der Beleg gekürzt. Die App sagt dir jeweils, was sie gekürzt hat.
 - Der Text ist frei bearbeitbar. Der Zähler rechnet wie X (Links = 23 Zeichen, Emojis doppelt). **Post kopieren** kopiert genau den Text im Feld.
 
+**Ab Version 3.12.0:**
+
+- **Quelle als Folgeantwort:** Der Post bleibt ohne Link. Die Quellen der verwendeten Einträge stehen in einer eigenen, bearbeitbaren Folgeantwort (ebenfalls höchstens 280 Zeichen) mit Knopf **Folgeantwort kopieren**. Erst den Post absenden, dann auf den eigenen Post antworten.
+- **Prüfstatus beachten:** Einträge mit „Teilweise belegt“, „Umstritten“ oder „Veraltet“ werden vorsichtig formuliert (abschaltbar). „Neu“/„In Prüfung“ erzeugen einen Hinweis. Widerlegte Fakten werden nicht als Argument verwendet. Widerlegte Behauptungen dienen weiter dazu, die Gegenseite zu widerlegen.
+
 ### KI-Auftrag kopieren (optional, ab Version 3.6.0)
 
 Unter **Optionen → KI-Erweiterung** einschalten (standardmäßig aus). Danach gibt es in **Behauptung prüfen** und **Antwort entwerfen** den Knopf **KI-Auftrag erstellen**:

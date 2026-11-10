@@ -178,6 +178,18 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] R9 **Post kopieren** → in X einfügen: genau dein (bearbeiteter) Text. **Neu erzeugen** stellt den automatischen Text wieder her.
 - [ ] R10 Nichts davon wird gespeichert (Anzahl der Einträge bleibt gleich).
 
+## S. Quelle als Folgeantwort und Prüfstatus (ab Version 3.12.0)
+
+- [ ] S1 Optionen → App: Version 3.12.0.
+- [ ] S2 Diskussion → **Antwort entwerfen** → unten „Vereinte Nationen“ suchen und **Gründung der Vereinten Nationen** hinzufügen. Im Post steht kein Link und keine Quelle.
+- [ ] S3 Unter **Quelle als Folgeantwort** steht „Quelle: Charta der Vereinten Nationen …“ mit eigenem Zähler. **Folgeantwort kopieren** → in X als Antwort auf deinen eigenen Post einfügen (nicht absenden).
+- [ ] S4 **Westfälischer Friede 1648** (Teilweise belegt) hinzufügen: Ein Kasten **Prüfstatus beachten** erscheint. Der Post beginnt mit „Nach bisherigen Belegen spricht einiges dafür: …“. Im Aufbau steht „vorsichtig formuliert“.
+- [ ] S5 Haken **Vorsichtig formulieren** entfernen: Die vorsichtige Einleitung verschwindet, die Warnung bleibt („… ausgeschaltet“).
+- [ ] S6 Tipp auf den Eintragsnamen im Warnkasten öffnet den Eintrag.
+- [ ] S7 Alle entfernen, **Anteil erneuerbarer Energien …** (In Prüfung) hinzufügen: Hinweis „noch nicht geprüft“.
+- [ ] S8 Alle entfernen, **Impfstoffe verursachen Autismus** hinzufügen: Der Post widerlegt die Behauptung („… gilt als widerlegt: …“), ohne Warnkasten.
+- [ ] S9 Ein Eintrag ohne Quelle (z. B. Karte „Abschreckung …“): Statt Folgeantwort steht „keine verknüpfte Quelle“.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.
