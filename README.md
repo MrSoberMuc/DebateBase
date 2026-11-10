@@ -120,6 +120,8 @@ Unter dem Antwortentwurf gibt es die Karte **Post für X**. Sie baut einen sachl
 
 **Ab Version 3.13.0 – Threads:** Post-Art **Thread** verwendet alle gewählten Einträge (je Kernaussage und Evidenz) und verteilt sie automatisch an Satzgrenzen auf nummerierte Teile („1/3 …“), jeder höchstens 280 Zeichen inklusive Nummer. Jeder Teil ist einzeln bearbeitbar und hat einen eigenen Zähler und Kopierknopf. Die Quellen-Folgeantwort kommt als Antwort auf den letzten Teil.
 
+**Ab Version 3.14.0 – Entwürfe:** **Als Entwurf speichern** legt den Post (auch bearbeitet, auch Threads) samt Folgeantwort und Einstellungen lokal auf dem Gerät ab. Oben unter **Gespeicherte Entwürfe** lassen sie sich öffnen, weiterbearbeiten (**Entwurf aktualisieren** oder **Als neuen Entwurf**) und löschen. Die neuesten 200 bleiben erhalten. Hinweis: Entwürfe sind (noch) nicht Teil des JSON-Exports und der automatischen Sicherungen.
+
 ### KI-Auftrag kopieren (optional, ab Version 3.6.0)
 
 Unter **Optionen → KI-Erweiterung** einschalten (standardmäßig aus). Danach gibt es in **Behauptung prüfen** und **Antwort entwerfen** den Knopf **KI-Auftrag erstellen**:

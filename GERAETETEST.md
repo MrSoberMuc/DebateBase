@@ -202,6 +202,17 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] T8 Abschluss **Rückfrage**: Der letzte Teil endet mit „Welche Quellen kennt ihr dazu?“.
 - [ ] T9 Zurück auf **Antwort**: wieder ein einzelnes Textfeld.
 
+## U. Entwürfe speichern (ab Version 3.14.0)
+
+- [ ] U1 Optionen → App: Version 3.14.0.
+- [ ] U2 Diskussion → **Antwort entwerfen**: Einen Eintrag hinzufügen, Post-Art **Eigener Post**, den Text etwas ändern → **Als Entwurf speichern**. Meldung „Entwurf gespeichert“.
+- [ ] U3 App komplett schließen und neu öffnen → Diskussion → Antwort entwerfen: Oben steht **Gespeicherte Entwürfe (1)**. Antippen klappt die Liste auf; sie zeigt Post-Art, Uhrzeit und Textanfang.
+- [ ] U4 Entwurf antippen: Dein geänderter Text, die Post-Art, der Abschluss, die Folgeantwort und die gewählten Einträge sind wieder da. In der Post-Karte steht „Geöffneter Entwurf: …“.
+- [ ] U5 Text ändern → **Entwurf aktualisieren**: Es bleibt ein Entwurf (mit neuem Text). **Als neuen Entwurf** legt einen zweiten an.
+- [ ] U6 Einen **Thread** speichern, einen Teil vorher bearbeiten: Nach dem Öffnen sind alle Teile genau so wieder da. In der Liste steht „… Teile“.
+- [ ] U7 Löschen: Tipp auf ✕ → „Löschen?“ → nochmals tippen. Der Entwurf verschwindet.
+- [ ] U8 Deine Einträge, Quellen und Karten bleiben dabei unverändert.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

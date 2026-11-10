@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-var APP_VERSION='3.13.0';
+var APP_VERSION='3.14.0';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var uid=function(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
@@ -174,7 +174,7 @@ function checkIntegrity(){
  return iss}
 
 /* ---------- Hilfen ---------- */
-var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,dmode:'suche',ctext:'',cpost:'',cres:null,rclaim:'',rsel:[],rrel:{},rstyle:'sachlich',rq:'',ptype:'antwort',pclose:'keiner',ptext:null,phedge:true,pfollow:null,tparts:null,qtext:'',pendingKi:false,focusImport:false};
+var ui={route:'dashboard',q:'',type:'',topic:'',status:'',sort:'relevanz',sq:'',skind:'',aq:'',dq:'',donly:false,dmode:'suche',ctext:'',cpost:'',cres:null,rclaim:'',rsel:[],rrel:{},rstyle:'sachlich',rq:'',ptype:'antwort',pclose:'keiner',ptext:null,phedge:true,pfollow:null,tparts:null,pdraft:null,qtext:'',pendingKi:false,focusImport:false};
 var ROUTES=[['dashboard','Dashboard','Start','home','Übersicht über deine Wissensdatenbank'],['wissen','Wissensbibliothek','Wissen','book','Fakten, Definitionen, Studien und mehr'],['argumente','Argumentationsarchiv','Argumente','scale','Behauptungen mit Gegenargumenten'],['quellen','Quellenarchiv','Quellen','doc','Belege und Fundstellen'],['diskussion','Diskussionsmodus','Diskussion','chat','Schnell nachschlagen und kopieren'],['einstellungen','Einstellungen','Optionen','sliders','Darstellung und Daten']];
 function norm(s){return String(s||'').toLowerCase()}
 function matches(hay,q){var ts=norm(q).split(/\s+/).filter(Boolean),h=norm(hay);return ts.every(function(t){return h.indexOf(t)>=0})}
@@ -944,7 +944,7 @@ function replyItems(){
   return {kind:p[0],id:o.id,title:o.title,type:o.type,status:o.status,claimCore:o.claimCore,description:o.description,counter:o.counter,evidence:o.evidence,conclusion:o.conclusion,rel:ui.rrel[key]||'ergaenzend',
    sources:(o.sourceIds||[]).map(function(s){return Repo.get('sources',s)}).filter(Boolean).map(function(s){return {id:s.id,title:s.title,publisher:s.publisher,year:s.year,url:s.url}})}}).filter(Boolean)}
 function viewReply(){
- return '<div class="card hint-rules"><p><b>Entwürfe nur aus deinen gespeicherten Einträgen und Quellen.</b> Keine KI, keine neuen Fakten. Jeder Satz trägt eine Belegnummer; nicht belegte Sätze sind markiert. Prüfe und bearbeite den Entwurf vor dem Posten.</p></div>'+
+ return draftList()+'<div class="card hint-rules"><p><b>Entwürfe nur aus deinen gespeicherten Einträgen und Quellen.</b> Keine KI, keine neuen Fakten. Jeder Satz trägt eine Belegnummer; nicht belegte Sätze sind markiert. Prüfe und bearbeite den Entwurf vor dem Posten.</p></div>'+
  '<div class="field"><label for="rclaim">Worauf antwortest du? (optional)</label><textarea class="sm" id="rclaim" placeholder="z. B. die Behauptung aus dem X-Beitrag">'+esc(ui.rclaim)+'</textarea></div>'+
  '<button class="btn block" data-act="reply-suggest">'+ic('search',18)+'Passende Einträge vorschlagen</button>'+
  '<div class="sec"><div class="sec-h"><h2 id="rselh">Verwendete Einträge</h2>'+(ui.rsel.length?'<button class="link" data-act="reply-clear">Alle entfernen</button>':'')+'</div><div id="rsel" class="stack"></div></div>'+
@@ -1014,6 +1014,40 @@ function threadBlock(p){var T=threadTexts(p),edited=ui.tparts!=null;
  '<div class="stack" id="tparts">'+T.map(function(t,i){var n=Analyse.xLength(t);
   return '<div class="tpart"><div class="field"><label for="tp-'+i+'">Teil '+(i+1)+' von '+T.length+'</label><textarea class="tp" id="tp-'+i+'" data-i="'+i+'" rows="'+tpRows(t)+'">'+esc(t)+'</textarea></div>'+
   '<div class="meta"><span class="chip tag'+(n>Analyse.X_MAX?' over':'')+'" id="tpc-'+i+'">'+pcountHtml(n)+'</span><button class="btn sm" data-act="tpart-copy" data-v="'+i+'">'+ic('copy',16)+'Teil '+(i+1)+' kopieren</button></div></div>'}).join('')+'</div>'}
+/* ---------- Entwürfe speichern (Phase 5, Etappe 4) ----------
+ * Liegen lokal in IndexedDB (Verwaltungsdaten, Schlüssel „xDrafts“).
+ * Gespeichert werden der genaue Text (auch bearbeitet), die Folgeantwort
+ * und die Einstellungen, damit der Entwurf später genauso weiterbearbeitet
+ * werden kann. Die neuesten 200 bleiben erhalten. */
+var MAX_DRAFTS=200;
+function drafts(){var l=Repo.db&&Repo.db.meta.xDrafts;return Array.isArray(l)?l:[]}
+function getDraft(id){return drafts().filter(function(d){return d.id===id})[0]}
+function draftTitle(d){var t=(d.type==='thread'?(d.parts||[])[0]:d.text)||'';t=String(t).replace(/^\d+\/\d+ /,'').replace(/\s+/g,' ').trim();return t.length>70?t.slice(0,67).trimEnd()+'…':(t||'Leerer Entwurf')}
+function draftSnapshot(){
+ var p=currentPost();if(!p||!p.parts.length)return null;
+ var d={type:p.type,close:ui.pclose,hedge:ui.phedge,claim:ui.rclaim,keys:ui.rsel.slice(),rel:JSON.parse(JSON.stringify(ui.rrel))};
+ if(p.type==='thread')d.parts=threadTexts(p).slice();else d.text=ui.ptext!=null?ui.ptext:p.text;
+ d.follow=ui.pfollow!=null?ui.pfollow:(p.follow&&p.follow.text)||'';
+ d.title=draftTitle(d);return d}
+function saveDraft(mode){
+ var d=draftSnapshot();if(!d){toast('Kein Post zum Speichern');return}
+ var t=Date.now(),L=drafts().slice(),old=mode==='update'&&ui.pdraft?getDraft(ui.pdraft):null;
+ if(old){d.id=old.id;d.created=old.created;d.updated=t;L=L.map(function(x){return x.id===old.id?d:x})}
+ else{d.id=uid('d');d.created=t;d.updated=t;L.unshift(d)}
+ L.sort(function(a,b){return b.updated-a.updated});L=L.slice(0,MAX_DRAFTS);
+ Repo.setMeta('xDrafts',L).then(function(){ui.pdraft=d.id;render();toast(old?'Entwurf aktualisiert':'Entwurf gespeichert')},function(){})}
+function openDraft(id){var d=getDraft(id);if(!d)return;
+ ui.rclaim=d.claim||'';ui.rsel=(d.keys||[]).slice();ui.rrel=JSON.parse(JSON.stringify(d.rel||{}));ui.ptype=Analyse.POST_TYPES[d.type]?d.type:'antwort';ui.pclose=d.close||'keiner';ui.phedge=d.hedge!==false;
+ ui.ptext=d.type==='thread'?null:(d.text||'');ui.tparts=d.type==='thread'?(d.parts||[]).slice():null;ui.pfollow=d.follow!=null?d.follow:null;ui.pdraft=d.id;ui.dmode='antwort';
+ var miss=(d.keys||[]).filter(function(k){var x=replySplit(k);return !Repo.get(x[0],x[1])}).length;
+ render();setTimeout(function(){var el=$('#post');if(el&&el.scrollIntoView)el.scrollIntoView({block:'start'})},60);
+ toast(miss?'Entwurf geöffnet. '+miss+(miss===1?' Eintrag wurde':' Einträge wurden')+' inzwischen gelöscht.':'Entwurf geöffnet')}
+function deleteDraft(id){var L=drafts().filter(function(d){return d.id!==id});if(ui.pdraft===id)ui.pdraft=null;
+ Repo.setMeta('xDrafts',L).then(function(){render();toast('Entwurf gelöscht')},function(){})}
+function draftList(){var L=drafts();if(!L.length)return '';
+ return '<details class="card drafts" id="drafts"'+(ui.draftsOpen?' open':'')+'><summary><b>Gespeicherte Entwürfe ('+L.length+')</b></summary><div class="stack" style="margin-top:10px">'+L.map(function(d){
+  return '<div class="lk'+(d.id===ui.pdraft?' cur':'')+'"><button class="lk-main" data-act="draft-open" data-v="'+esc(d.id)+'"><small>'+esc(Analyse.POST_TYPES[d.type]||d.type)+(d.type==='thread'?' · '+(d.parts||[]).length+((d.parts||[]).length===1?' Teil':' Teile'):'')+' · '+esc(fmtSaved(d.updated))+'</small><b>'+esc(d.title)+'</b></button>'+
+  '<button class="icon-btn sm" data-act="draft-del" data-v="'+esc(d.id)+'" aria-label="Entwurf löschen">'+ic('x',18)+'</button></div>'}).join('')+'</div></details>'}
 function xPostCard(){
  var p=currentPost();if(!p||!p.parts.length)return '';
  var text=ui.ptext!=null?ui.ptext:p.text,n=Analyse.xLength(text),edited=ui.ptext!=null;
@@ -1025,6 +1059,8 @@ function xPostCard(){
  postWarnings(p)+
  (p.type==='thread'?threadBlock(p):singleBlock(p,text,n,edited))+
  '<div class="btns" style="margin-top:10px"><button class="btn" data-act="post-reset">Neu erzeugen</button>'+(p.type==='thread'?'':'<button class="btn primary" data-act="post-copy">'+ic('copy',18)+'Post kopieren</button>')+'</div>'+
+ '<div class="btns" style="margin-top:8px">'+(ui.pdraft&&getDraft(ui.pdraft)?'<button class="btn" data-act="draft-save" data-v="update">'+ic('plus',18)+'Entwurf aktualisieren</button><button class="btn" data-act="draft-save" data-v="new">Als neuen Entwurf</button>':'<button class="btn block" data-act="draft-save" data-v="new">'+ic('plus',18)+'Als Entwurf speichern</button>')+'</div>'+
+ (ui.pdraft&&getDraft(ui.pdraft)?'<p class="note">Geöffneter Entwurf: „'+esc(getDraft(ui.pdraft).title)+'“</p>':'')+
  '<h4 style="margin-top:14px">Aufbau</h4><div class="stack">'+p.parts.map(function(x){
   return '<div class="row'+(x.ok?'':' unb-row')+'"><div><small>'+esc(x.roleLabel)+(x.n?' · aus ['+x.n+'] '+esc(p.refs[x.n-1].title)+' ('+esc(x.from)+')':' · feste Vorlage')+(x.cut?' · gekürzt':'')+(x.hedged?' · vorsichtig formuliert':'')+(x.label?' · '+esc(x.label):'')+'</small><b>'+esc(x.text)+'</b></div></div>'}).join('')+'</div>'+followCard(p)+'</article>'}
 function paintFollowCount(){var t=$('#pfollow');if(!t)return;var n=Analyse.xLength(t.value),c=$('#pfcount');if(c){c.textContent=pcountHtml(n);c.classList.toggle('over',n>Analyse.X_MAX)}}
@@ -1313,6 +1349,9 @@ document.addEventListener('click',function(ev){
   case 'reply-copyx':var dx=currentDraft();if(dx)copy(dx.x,dx.unsupported?'Kopiert. Achtung: enthält nicht belegte Aussagen':'Text für X kopiert');break;
   case 'post-type':ui.ptype=Analyse.POST_TYPES[v]?v:'antwort';ui.ptext=null;ui.pfollow=null;ui.tparts=null;paintDraft();break;
   case 'post-reset':ui.ptext=null;ui.pfollow=null;ui.tparts=null;paintDraft();break;
+  case 'draft-save':saveDraft(v);break;
+  case 'draft-open':ui.draftsOpen=false;openDraft(v);break;
+  case 'draft-del':if(armed(b,'Löschen?'))deleteDraft(v);break;
   case 'tpart-copy':var tpe=$('#tp-'+v),tpv=tpe?tpe.value:'',tpn=Analyse.xLength(tpv);if(!tpv.trim()){toast('Dieser Teil ist leer');break}copy(tpv,tpn>Analyse.X_MAX?'Kopiert. Achtung: '+tpn+' Zeichen, länger als 280':'Teil '+(+v+1)+' kopiert');break;
   case 'follow-copy':var ft=$('#pfollow'),fv=ft?ft.value:'',fn=Analyse.xLength(fv);if(!fv.trim()){toast('Die Folgeantwort ist leer');break}copy(fv,fn>Analyse.X_MAX?'Kopiert. Achtung: '+fn+' Zeichen, länger als 280':'Folgeantwort kopiert');break;
   case 'post-copy':var pt=$('#ptext'),pv=pt?pt.value:'',pn=Analyse.xLength(pv),pp=currentPost();if(!pv.trim()){toast('Der Post ist leer');break}copy(pv,pn>Analyse.X_MAX?'Kopiert. Achtung: '+pn+' Zeichen, länger als 280':(pp&&pp.unsupported&&ui.ptext==null?'Kopiert. Achtung: enthält nicht belegte Teile':pp&&pp.warnings&&pp.warnings.some(function(w){return w.level!=='stop'})?'Kopiert. Prüfstatus-Hinweise beachten':'Post kopiert'));break;
@@ -1382,6 +1421,7 @@ document.addEventListener('change',function(ev){var i=ev.target.id,v=ev.target.v
  else if(i==='mig-file'&&ev.target.files[0]){var fl=ev.target.files[0],r=new FileReader();r.onload=function(){mig.text=String(r.result);mig.fileName=fl.name+' ('+Math.round(fl.size/1024)+' KB)';mig.error='';migRender()};r.onerror=function(){mig.error='Die Datei konnte nicht gelesen werden.';migRender()};r.readAsText(fl)}
  else if(ev.target.name==='ki-item'&&kiDraft){kiDraft.sel[v]=ev.target.checked;kiRefresh()}else if(i==='ki-keep'&&kiDraft){kiDraft.keep=ev.target.checked;kiRefresh()}
  else if(ev.target.name==='mig-mode'){mig.mode=v;migRender(true)}else if(ev.target.name==='mig-conflict'){mig.conflict=v;migRender(true)}});
+document.addEventListener('toggle',function(ev){if(ev.target&&ev.target.id==='drafts')ui.draftsOpen=ev.target.open},true);
 document.addEventListener('submit',function(ev){ev.preventDefault();var f=ev.target,k=f.dataset.form;if(k==='entry')saveEntry(f);else if(k==='source')saveSource(f);else if(k==='arg')saveArg(f);else if(k==='link')saveLink(f);else if(k==='post')savePost(f,ev.submitter&&ev.submitter.value)});
 window.addEventListener('hashchange',route);
 /* Speicherfehler wurden bereits angezeigt; nicht zusätzlich als unbehandelt melden. */

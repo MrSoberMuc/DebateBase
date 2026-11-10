@@ -268,3 +268,11 @@ details.eval summary{cursor:pointer;padding:2px 0}
 .tpart .field{margin-bottom:6px}
 .tpart .meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .btn.sm{min-height:38px;padding:6px 12px;font-size:.8125rem}
+/* Entwürfe (3.14.0) */
+.card.drafts{margin-bottom:12px}
+.card.drafts summary{cursor:pointer;min-height:28px;display:flex;align-items:center}
+.lk.cur .lk-main{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.card.drafts summary{list-style:none;justify-content:space-between}
+.card.drafts summary::-webkit-details-marker{display:none}
+.card.drafts summary::after{content:'▾';color:var(--muted);transition:transform .2s}
+.card.drafts[open] summary::after{transform:rotate(180deg)}
