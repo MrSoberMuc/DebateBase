@@ -190,6 +190,18 @@ Ergebnis je Punkt notieren: ✅ klappt · ❌ klappt nicht (was ist passiert?)
 - [ ] S8 Alle entfernen, **Impfstoffe verursachen Autismus** hinzufügen: Der Post widerlegt die Behauptung („… gilt als widerlegt: …“), ohne Warnkasten.
 - [ ] S9 Ein Eintrag ohne Quelle (z. B. Karte „Abschreckung …“): Statt Folgeantwort steht „keine verknüpfte Quelle“.
 
+## T. Threads (ab Version 3.13.0)
+
+- [ ] T1 Optionen → App: Version 3.13.0.
+- [ ] T2 Diskussion → **Antwort entwerfen**: „Die EU hat 28 Mitgliedstaaten.“ eingeben und unten mehrere Einträge hinzufügen (z. B. „Vereinte Nationen“, „Westfälischer Friede“, „Ozonschicht“).
+- [ ] T3 Post-Art: Die vier Knöpfe stehen in zwei Reihen: Antwort, Eigener Post, Thread, Zitat-Post.
+- [ ] T4 **Thread** wählen: Es erscheinen nummerierte Teile („1/2 …“, „2/2 …“). Teil 1 beginnt mit „Oft heißt es: …“. Jeder Teil hat einen eigenen Zähler (höchstens 280) und ist vollständig lesbar.
+- [ ] T5 Die Teile enden jeweils am Satzende (kein Satz mitten im Wort getrennt).
+- [ ] T6 Einen Teil bearbeiten: Nur sein Zähler ändert sich. **Teil 2 kopieren** kopiert genau diesen Teil.
+- [ ] T7 In X: Teil 1 als neuen Post einfügen, mit „+“ Teil 2 usw. ergänzen (nicht absenden). Die Folgeantwort mit der Quelle kommt als Antwort auf den letzten Teil.
+- [ ] T8 Abschluss **Rückfrage**: Der letzte Teil endet mit „Welche Quellen kennt ihr dazu?“.
+- [ ] T9 Zurück auf **Antwort**: wieder ein einzelnes Textfeld.
+
 ## G. Update
 
 - [ ] G1 Wenn „Neue Version verfügbar“ erscheint: **Jetzt aktualisieren** → App lädt neu, Daten sind da.

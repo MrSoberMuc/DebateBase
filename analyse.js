@@ -838,7 +838,7 @@
    * gespeicherten Texten; nur Einleitung und Rückfrage sind feste Vorlagen.
    * Ziel: höchstens 280 Zeichen (kein X Premium).
    * ===================================================================== */
-  var POST_TYPES = { antwort: 'Antwort', eigen: 'Eigener Post', zitat: 'Zitat-Post' };
+  var POST_TYPES = { antwort: 'Antwort', eigen: 'Eigener Post', thread: 'Thread', zitat: 'Zitat-Post' };
   var POST_CLOSE = { keiner: 'Kein Abschluss', frage: 'Rückfrage', schluss: 'Schlussfolgerung' };
   var X_MAX = 280, X_URL = 23;
   var URL_RE = /(?:https?:\/\/|www\.)[^\s]+/gi;
@@ -917,7 +917,46 @@
     /* Einleitung nur beim eigenen Post: er muss ohne Vorwissen verständlich sein */
     var claim = String(input.claim || '').replace(/\s+/g, ' ').trim();
     var intro = null;
-    if (type === 'eigen' && claim) intro = { text: 'Oft heißt es: „' + noEnd(clip(claim, 100)) + '“', tpl: true };
+    if ((type === 'eigen' || type === 'thread') && claim) intro = { text: 'Oft heißt es: „' + noEnd(clip(claim, 100)) + '“', tpl: true };
+
+    var ROLE = { einleitung: 'Einleitung', kern: 'Kernaussage', beleg: 'Beleg', abschluss: 'Abschluss' };
+    var refIdx = {};
+    var refOf = function (it) {
+      var key = it.kind + ':' + it.id;
+      if (!refIdx[key]) { var b = backing(it, SL); refIdx[key] = { n: res.refs.length + 1, kind: it.kind, id: it.id, title: it.title, status: it.status, ok: b.ok, label: b.label, sources: it.sources || [] }; res.refs.push(refIdx[key]); }
+      return refIdx[key];
+    };
+    var pushPart = function (role, p) {
+      var r = p.it ? refOf(p.it) : null;
+      res.parts.push({ role: role, roleLabel: ROLE[role], text: p.text, n: r ? r.n : null, from: p.from || 'Vorlage', ok: p.tpl ? true : p.ok, label: p.tpl ? '' : p.label, tpl: !!p.tpl, cut: !!p.cut, hedged: !!p.hedged });
+    };
+    var finishWarnings = function () {
+      res.refs.forEach(function (r) {
+        var it = items.filter(function (x) { return x.kind === r.kind && x.id === r.id; })[0];
+        var w = it && statusWarning(it, SL, hedgeOn);
+        if (w) warnings.push({ id: r.id, kind: r.kind, n: r.n, title: r.title, status: r.status, level: w.level, text: w.text });
+      });
+      res.follow = buildFollowUp(res.refs);
+      res.unsupported = res.parts.filter(function (p) { return !p.ok; }).length;
+    };
+
+    /* Thread (Phase 5, Etappe 3): alle gewählten Einträge, je Kernaussage + Evidenz,
+       automatisch an Satzgrenzen auf nummerierte Posts verteilt */
+    if (type === 'thread') {
+      if (intro) pushPart('einleitung', intro);
+      cand.forEach(function (c) {
+        pushPart('kern', c);
+        var evT = firstSentences(c.it.evidence, 2);
+        if (evT) pushPart('beleg', { it: c.it, text: endDot(evT), ok: c.ok, label: c.label, from: 'Evidenz' });
+      });
+      if (abschluss && abschluss.it && !refIdx[abschluss.it.kind + ':' + abschluss.it.id]) abschluss = null;
+      if (abschluss) pushPart('abschluss', abschluss);
+      res.posts = splitThread(res.parts.map(function (p) { return p.text; }));
+      res.text = res.posts.join('\n\n');
+      res.chars = res.posts.reduce(function (m, t) { return Math.max(m, xLength(t)); }, 0);
+      finishWarnings();
+      return res;
+    }
 
     var sep = type === 'eigen' ? '\n\n' : ' ';
     var compose = function () { return [intro, kern, beleg, abschluss].filter(Boolean).map(function (p) { return p.text; }).join(sep); };
@@ -932,29 +971,53 @@
     }
     if (!fits()) { kern = Object.assign({}, kern, { text: clip(kern.text, X_MAX - (beleg ? xLength(beleg.text) + sep.length : 0)), cut: true }); notes.push('Kernaussage gekürzt (…). Bitte prüfen, ob der Sinn erhalten bleibt.'); }
 
-    var ROLE = { einleitung: 'Einleitung', kern: 'Kernaussage', beleg: 'Beleg', abschluss: 'Abschluss' };
-    var refIdx = {};
-    var refOf = function (it) {
-      var key = it.kind + ':' + it.id;
-      if (!refIdx[key]) { var b = backing(it, SL); refIdx[key] = { n: res.refs.length + 1, kind: it.kind, id: it.id, title: it.title, status: it.status, ok: b.ok, label: b.label, sources: it.sources || [] }; res.refs.push(refIdx[key]); }
-      return refIdx[key];
-    };
-    [['einleitung', intro], ['kern', kern], ['beleg', beleg], ['abschluss', abschluss]].forEach(function (x) {
-      var p = x[1]; if (!p) return;
-      var r = p.it ? refOf(p.it) : null;
-      res.parts.push({ role: x[0], roleLabel: ROLE[x[0]], text: p.text, n: r ? r.n : null, from: p.from || 'Vorlage', ok: p.tpl ? true : p.ok, label: p.tpl ? '' : p.label, tpl: !!p.tpl, cut: !!p.cut, hedged: !!p.hedged });
-    });
-    /* Warnungen zu den tatsächlich verwendeten Einträgen */
-    res.refs.forEach(function (r) {
-      var it = items.filter(function (x) { return x.kind === r.kind && x.id === r.id; })[0];
-      var w = it && statusWarning(it, SL, hedgeOn);
-      if (w) warnings.push({ id: r.id, kind: r.kind, n: r.n, title: r.title, status: r.status, level: w.level, text: w.text });
-    });
-    res.follow = buildFollowUp(res.refs);
+    [['einleitung', intro], ['kern', kern], ['beleg', beleg], ['abschluss', abschluss]].forEach(function (x) { if (x[1]) pushPart(x[0], x[1]); });
     res.text = compose();
     res.chars = xLength(res.text);
-    res.unsupported = res.parts.filter(function (p) { return !p.ok; }).length;
+    finishWarnings();
     return res;
+  }
+
+  /* Thread aufteilen (Phase 5, Etappe 3)
+     segments: Absätze (z. B. Kernaussage, Beleg). Verteilt Sätze auf Posts mit
+     höchstens 280 Zeichen inklusive Nummer „1/4 “. Ein Satz wird nur dann an
+     Wortgrenzen getrennt, wenn er allein nicht in einen Post passt. */
+  function splitThread(segments, max) {
+    max = max || X_MAX;
+    var units = [];
+    (segments || []).forEach(function (seg) {
+      var ss = sentences(String(seg || '').replace(/[ \t]+/g, ' ').trim());
+      if (!ss.length && String(seg || '').trim()) ss = [String(seg).trim()];
+      ss.forEach(function (t, i) { units.push({ text: t, para: i === 0 }); });
+    });
+    if (!units.length) return [];
+    var pack = function (room) {
+      var out = [], cur = '';
+      var put = function (t, para) {
+        var j = cur ? (para ? '\n\n' : ' ') : '';
+        if (xLength(cur + j + t) <= room) { cur += j + t; return; }
+        if (cur) { out.push(cur); cur = ''; }
+        if (xLength(t) <= room) { cur = t; return; }
+        /* Satz zu lang: an Wortgrenzen trennen */
+        t.split(' ').forEach(function (w) {
+          var j2 = cur ? ' ' : '';
+          if (xLength(cur + j2 + w) <= room) cur += j2 + w;
+          else { if (cur) out.push(cur); cur = w; }
+        });
+      };
+      units.forEach(function (u) { put(u.text, u.para); });
+      if (cur) out.push(cur);
+      return out;
+    };
+    var n = 1, posts = pack(max);
+    if (posts.length === 1) return posts;
+    for (var k = 0; k < 6; k++) {
+      n = posts.length;
+      posts = pack(max - xLength(n + '/' + n + ' '));
+      if (posts.length <= n) break;
+    }
+    n = posts.length;
+    return posts.map(function (t, i) { return (i + 1) + '/' + n + ' ' + t; });
   }
 
   /* Quellen als eigene Folgeantwort (Phase 5, Etappe 2)
@@ -1022,6 +1085,7 @@
     buildPost: buildPost,
     xLength: xLength,
     buildFollowUp: buildFollowUp,
+    splitThread: splitThread,
     POST_TYPES: POST_TYPES,
     POST_CLOSE: POST_CLOSE,
     X_MAX: X_MAX

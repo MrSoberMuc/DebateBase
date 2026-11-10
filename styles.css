@@ -262,3 +262,9 @@ details.eval summary{cursor:pointer;padding:2px 0}
 .card.pwarn p{margin:6px 0 0;font-size:.875rem;line-height:1.4}
 .card.pwarn .link{padding:0;font-size:.875rem;text-align:left}
 #pfollow-sec{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+/* Threads (3.13.0) */
+#ptype{grid-template-columns:repeat(2,1fr)}
+.tpart{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.tpart .field{margin-bottom:6px}
+.tpart .meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.btn.sm{min-height:38px;padding:6px 12px;font-size:.8125rem}

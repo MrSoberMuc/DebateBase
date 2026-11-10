@@ -118,6 +118,8 @@ Unter dem Antwortentwurf gibt es die Karte **Post für X**. Sie baut einen sachl
 - **Quelle als Folgeantwort:** Der Post bleibt ohne Link. Die Quellen der verwendeten Einträge stehen in einer eigenen, bearbeitbaren Folgeantwort (ebenfalls höchstens 280 Zeichen) mit Knopf **Folgeantwort kopieren**. Erst den Post absenden, dann auf den eigenen Post antworten.
 - **Prüfstatus beachten:** Einträge mit „Teilweise belegt“, „Umstritten“ oder „Veraltet“ werden vorsichtig formuliert (abschaltbar). „Neu“/„In Prüfung“ erzeugen einen Hinweis. Widerlegte Fakten werden nicht als Argument verwendet. Widerlegte Behauptungen dienen weiter dazu, die Gegenseite zu widerlegen.
 
+**Ab Version 3.13.0 – Threads:** Post-Art **Thread** verwendet alle gewählten Einträge (je Kernaussage und Evidenz) und verteilt sie automatisch an Satzgrenzen auf nummerierte Teile („1/3 …“), jeder höchstens 280 Zeichen inklusive Nummer. Jeder Teil ist einzeln bearbeitbar und hat einen eigenen Zähler und Kopierknopf. Die Quellen-Folgeantwort kommt als Antwort auf den letzten Teil.
+
 ### KI-Auftrag kopieren (optional, ab Version 3.6.0)
 
 Unter **Optionen → KI-Erweiterung** einschalten (standardmäßig aus). Danach gibt es in **Behauptung prüfen** und **Antwort entwerfen** den Knopf **KI-Auftrag erstellen**:

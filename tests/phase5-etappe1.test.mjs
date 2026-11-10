@@ -26,10 +26,10 @@ await test('Ohne Einträge kein Post; bestehender Entwurf bleibt unverändert', 
   await ctx.close();
 });
 
-await test('Drei Post-Arten, Zähler bis 280, Aufbau mit Herkunft', async () => {
+await test('Post-Arten, Zähler bis 280, Aufbau mit Herkunft', async () => {
   const { ctx, page } = await withSample();
   await openWithClaim(page);
-  assert(await page.locator('#ptype button').count() === 3, 'drei Post-Arten');
+  assert(await page.locator('#ptype button').count() === 4, 'vier Post-Arten (ab 3.13.0 mit Thread)');
   const a = await page.inputValue('#ptext');
   assert(a.length > 0 && !a.includes('Oft heißt es') && !/\[\d/.test(a), 'Antwort: ' + a);
   assert(await count(page) <= 280, 'Zähler');
@@ -92,7 +92,7 @@ await test('Handy (360 px): keine Überbreite, Bildschirmfoto', async () => {
   const ctx = await browser.newContext(); const page = await newPage(ctx, 360);
   await page.click('[data-act=load-sample]'); await page.waitForTimeout(200);
   await openWithClaim(page);
-  for (const t of ['antwort', 'eigen', 'zitat']) {
+  for (const t of ['antwort', 'eigen', 'thread', 'zitat']) {
     await page.click(`[data-act=post-type][data-v=${t}]`);
     assert(await page.evaluate(() => document.documentElement.scrollWidth) <= 360, t + ': Überbreite');
   }
